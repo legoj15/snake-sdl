@@ -30,6 +30,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Ubuntu runners need some build tools for certain vcpkg ports (like libxcrypt)
+      - name: Install Linux build deps (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            autoconf autoconf-archive automake libtool \
+            pkg-config \
+            python3-venv
+
       - name: Setup CMake + Ninja
         uses: lukka/get-cmake@latest
 
