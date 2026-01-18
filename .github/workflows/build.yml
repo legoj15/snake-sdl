@@ -38,7 +38,7 @@ jobs:
           sudo apt-get install -y \
             autoconf autoconf-archive automake libtool \
             pkg-config \
-            python3-venv
+            python3-venv libltdl-dev
 
       - name: Setup CMake + Ninja
         uses: lukka/get-cmake@latest
