@@ -1,0 +1,51 @@
+name: build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    name: ${{ matrix.os }} (${{ matrix.build_type }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        build_type: [Debug, Release]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Installs (and caches) CMake + Ninja
+      - name: Setup CMake + Ninja
+        uses: lukka/get-cmake@latest
+
+      # Sets up vcpkg and enables binary caching via GitHub Actions cache
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          # This makes run-vcpkg read your repo's vcpkg.json (manifest mode)
+          vcpkgJsonGlob: '**/vcpkg.json'
+          # Keep vcpkg inside the runner workspace (good for caching)
+          vcpkgDirectory: '${{ github.workspace }}/vcpkg'
+
+      - name: Configure (CMake + vcpkg toolchain)
+        run: >
+          cmake -S . -B build
+          -G Ninja
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      # Upload the built executable so you can download it from the workflow run
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: snake-${{ matrix.os }}-${{ matrix.build_type }}
+          path: |
+            build/snake
+            build/snake.exe
