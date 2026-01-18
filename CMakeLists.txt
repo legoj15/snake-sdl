@@ -21,7 +21,18 @@ add_executable(snake ${SNAKE_SOURCES})
 target_include_directories(snake PRIVATE include)
 
 find_package(SDL3 CONFIG REQUIRED)
-target_link_libraries(snake PRIVATE SDL3::SDL3)
+
+if (WIN32)
+  # Prefer static target on Windows if available
+  if (TARGET SDL3::SDL3-static)
+    target_link_libraries(snake PRIVATE SDL3::SDL3-static)
+  else()
+    target_link_libraries(snake PRIVATE SDL3::SDL3)
+  endif()
+else()
+  target_link_libraries(snake PRIVATE SDL3::SDL3)
+endif()
+
 
 target_compile_options(snake PRIVATE
   $<$<C_COMPILER_ID:MSVC>:/W4>

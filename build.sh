@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BUILD_DIR="${BUILD_DIR:-build}"
-BUILD_TYPE="${BUILD_TYPE:-Debug}"
-GENERATOR="${GENERATOR:-Ninja}"
+# Usage:
+#   ./build.sh            # uses "debug"
+#   ./build.sh release    # uses "release"
+#   PRESET=debug ./build.sh
+#   VCPKG_ROOT=... ./build.sh debug
 
-# Prefer VCPKG_ROOT (recommended by vcpkg docs), but also accept VCPKG_TOOLCHAIN_FILE directly.
+PRESET="${1:-${PRESET:-debug}}"
+
+# vcpkg toolchain resolution (same as before)
 if [[ -n "${VCPKG_TOOLCHAIN_FILE:-}" ]]; then
   TOOLCHAIN="$VCPKG_TOOLCHAIN_FILE"
 elif [[ -n "${VCPKG_ROOT:-}" ]]; then
@@ -17,9 +21,6 @@ ERROR: vcpkg not configured.
 Set one of:
   - VCPKG_ROOT=/path/to/vcpkg
   - VCPKG_TOOLCHAIN_FILE=/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake
-
-Example:
-  export VCPKG_ROOT="$HOME/vcpkg"
 EOF
   exit 1
 fi
@@ -29,16 +30,15 @@ if [[ ! -f "$TOOLCHAIN" ]]; then
   exit 1
 fi
 
-# Optional triplet support
-EXTRA=()
+# Optional triplet support (your preset must read this env var to use it)
+# Example: VCPKG_TARGET_TRIPLET=x64-linux ./build.sh debug
 if [[ -n "${VCPKG_TARGET_TRIPLET:-}" ]]; then
-  EXTRA+=("-DVCPKG_TARGET_TRIPLET=$VCPKG_TARGET_TRIPLET")
+  echo "Using VCPKG_TARGET_TRIPLET=$VCPKG_TARGET_TRIPLET"
 fi
 
-cmake -S . -B "$BUILD_DIR" -G "$GENERATOR" \
-  -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
-  -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
-  "${EXTRA[@]}"
+echo "Using preset: $PRESET"
+cmake --preset "$PRESET"
+cmake --build --preset "$PRESET" --parallel
 
-cmake --build "$BUILD_DIR" --parallel
-echo "Built: ./$BUILD_DIR/snake"
+# Best-effort "Built:" message (depends on your preset's binaryDir)
+echo "Built (if binaryDir is default): ./build/snake"

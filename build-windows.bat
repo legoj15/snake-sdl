@@ -2,19 +2,18 @@
 setlocal EnableExtensions EnableDelayedExpansion
 
 REM ============================
-REM Defaults
+REM Defaults (kept for symmetry / future use)
 REM ============================
 if not defined BUILD_DIR set BUILD_DIR=build
 if not defined BUILD_TYPE set BUILD_TYPE=Debug
-if not defined GENERATOR set GENERATOR=Ninja
 
 REM ============================
 REM Resolve vcpkg toolchain
 REM ============================
 if defined VCPKG_TOOLCHAIN_FILE (
-    set TOOLCHAIN=%VCPKG_TOOLCHAIN_FILE%
+    set "TOOLCHAIN=%VCPKG_TOOLCHAIN_FILE%"
 ) else if defined VCPKG_ROOT (
-    set TOOLCHAIN=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake
+    set "TOOLCHAIN=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake"
 ) else (
     echo ERROR: vcpkg not configured.
     echo.
@@ -36,25 +35,20 @@ if not exist "%TOOLCHAIN%" (
 REM ============================
 REM Optional triplet
 REM ============================
-set EXTRA_ARGS=
-if defined VCPKG_TARGET_TRIPLET (
-    set EXTRA_ARGS=-DVCPKG_TARGET_TRIPLET=%VCPKG_TARGET_TRIPLET%
-)
+REM Your preset should read VCPKG_TARGET_TRIPLET if you want this to matter.
+REM Example: set VCPKG_TARGET_TRIPLET=x64-windows-static
+REM (No action needed here if it's already set in the environment.)
 
 REM ============================
-REM Configure
+REM Configure + Build using presets
 REM ============================
-cmake -S . -B "%BUILD_DIR%" -G "%GENERATOR%" ^
-  -DCMAKE_TOOLCHAIN_FILE="%TOOLCHAIN%" ^
-  -DCMAKE_BUILD_TYPE=%BUILD_TYPE% ^
-  %EXTRA_ARGS%
+set "PRESET=%~1"
+if "%PRESET%"=="" set "PRESET=debug"
 
+cmake --preset "%PRESET%"
 if errorlevel 1 exit /b 1
 
-REM ============================
-REM Build
-REM ============================
-cmake --build "%BUILD_DIR%" --parallel
+cmake --build --preset "%PRESET%" --parallel
 if errorlevel 1 exit /b 1
 
 echo Built: .\%BUILD_DIR%\snake.exe

@@ -12,7 +12,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Windows static dependencies (MSVC)
+          # Windows: static libs + static CRT => single EXE
           - os: windows-latest
             build_type: Debug
             triplet: x64-windows-static
@@ -20,8 +20,7 @@ jobs:
             build_type: Release
             triplet: x64-windows-static
 
-          # Linux: keep it simple for now (still reproducible)
-          # If you later want fully-static Linux, we'll switch to a custom triplet/toolchain.
+          # Linux builds for verification (distribution story can be separate)
           - os: ubuntu-latest
             build_type: Debug
             triplet: x64-linux
@@ -37,7 +36,7 @@ jobs:
         uses: lukka/get-cmake@latest 
 
       - name: Setup vcpkg (manifest mode + caching)
-        uses: lukka/run-vcpkg@v11 :contentReference[oaicite:2]{index=2}
+        uses: lukka/run-vcpkg@v11 :contentReference[oaicite:3]{index=3}
         with:
           vcpkgJsonGlob: '**/vcpkg.json'
           vcpkgDirectory: '${{ github.workspace }}/vcpkg'
@@ -49,7 +48,6 @@ jobs:
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
           -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
-        # Triplet selection via VCPKG_TARGET_TRIPLET is the documented approach. :contentReference[oaicite:3]{index=3}
 
       - name: Build
         run: cmake --build build --parallel
@@ -59,5 +57,5 @@ jobs:
         with:
           name: snake-${{ matrix.os }}-${{ matrix.build_type }}-${{ matrix.triplet }}
           path: |
-            build/snake
             build/snake.exe
+            build/snake
