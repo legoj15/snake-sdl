@@ -16,25 +16,29 @@
  *
  * Protocol (TCP):
  * - Game listens on 127.0.0.1:<port> and accepts a single client.
- * - Each simulation tick, the game sends one BotStateMsg (fixed size).
+ * - Each simulation tick, the game sends:
+ *     [BotStateMsg header] then [snake segments payload]
  * - The bot may send 1 byte at any time representing a direction:
  *     0=UP, 1=DOWN, 2=LEFT, 3=RIGHT (matches Dir enum in snake.h)
  *
  * Encoding:
- * - BotStateMsg fields are sent in network byte order (big-endian).
+ * - All integer fields are sent in network byte order (big-endian).
+ *
+ * Versioning:
+ * - version=1: header only (no segment payload)
+ * - version=2: header + snake segments payload:
+ *       snake_len * (int32 x, int32 y) for seg[0..snake_len-1]
  */
 
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "snake.h" // Dir, IVec2
-
-typedef struct Apple Apple; // fwd decl (include apple.h in bot.c)
+#include "snake.h" // Snake, Dir, IVec2
 
 typedef struct BotStateMsg {
   // Magic 'SNKB' (0x534E4B42) to sanity-check stream.
   uint32_t magic;
-  uint16_t version; // currently 1
+  uint16_t version; // currently 2
   uint16_t flags;   // bit0=game_over, bit1=you_win
 
   int32_t grid_w;
@@ -76,5 +80,7 @@ bool Bot_TryRecvDir(Bot *b, Dir *out_dir);
 
 // Sends one state message to the connected client (non-blocking best effort).
 // If no client is connected, this is a cheap no-op.
-void Bot_SendState(Bot *b, int grid_w, int grid_h, IVec2 head, IVec2 apple,
-                   int snake_len, int score, bool game_over, bool you_win);
+//
+// Version 2 sends header + snake segments payload.
+void Bot_SendState(Bot *b, const Snake *s, IVec2 apple, int score,
+                   bool game_over, bool you_win);

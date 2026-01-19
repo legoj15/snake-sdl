@@ -340,8 +340,7 @@ int main(void) {
       while (acc >= tick_ns) {
         // ----- BOT BRIDGE (tick-aligned) -----
         // Send state (best effort, non-blocking)
-        Bot_SendState(&bot, app.grid_w, app.grid_h, Snake_Head(&snake),
-                      apple.pos, snake.len, score, game_over, you_win);
+        Bot_SendState(&bot, &snake, apple.pos, score, game_over, you_win);
 
         // Receive at most one bot direction per tick
         Dir bot_dir;

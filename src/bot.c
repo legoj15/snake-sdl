@@ -3,8 +3,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "apple.h"
-
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #include <winsock2.h>
@@ -216,19 +214,48 @@ bool Bot_TryRecvDir(Bot *b, Dir *out_dir) {
   return true;
 }
 
-void Bot_SendState(Bot *b, int grid_w, int grid_h, IVec2 head, IVec2 apple,
-                   int snake_len, int score, bool game_over, bool you_win) {
-  if (!b || !b->enabled || !b->connected)
+// Non-blocking-ish send helper: if it would block or short-writes, we treat it
+// as failure. For localhost small payloads, this is typically fine.
+static bool send_all_or_drop(sock_t s, const void *data, int len) {
+  const char *p = (const char *)data;
+  int sent = 0;
+
+  while (sent < len) {
+    int n = (int)send(s, p + sent, len - sent, 0);
+    if (n > 0) {
+      sent += n;
+      continue;
+    }
+
+#if defined(_WIN32)
+    int err = WSAGetLastError();
+    if (err == WSAEWOULDBLOCK)
+      return false;
+#else
+    if (errno == EWOULDBLOCK || errno == EAGAIN)
+      return false;
+#endif
+    return false;
+  }
+
+  return true;
+}
+
+void Bot_SendState(Bot *b, const Snake *s, IVec2 apple, int score,
+                   bool game_over, bool you_win) {
+  if (!b || !b->enabled || !b->connected || !s)
     return;
 
   sock_t cs = as_sock(b->_client_sock);
   if (cs == SOCK_INVALID)
     return;
 
+  // Header (version 2)
   BotStateMsg m;
   memset(&m, 0, sizeof(m));
   m.magic = htonl(0x534E4B42u); // 'SNKB'
-  m.version = htons(1);
+  m.version = htons(2);
+
   uint16_t flags = 0;
   if (game_over)
     flags |= 1u;
@@ -236,27 +263,34 @@ void Bot_SendState(Bot *b, int grid_w, int grid_h, IVec2 head, IVec2 apple,
     flags |= 2u;
   m.flags = htons(flags);
 
-  m.grid_w = htonl(grid_w);
-  m.grid_h = htonl(grid_h);
+  m.grid_w = htonl(s->grid_w);
+  m.grid_h = htonl(s->grid_h);
+
+  IVec2 head = s->seg[0];
   m.head_x = htonl(head.x);
   m.head_y = htonl(head.y);
+
   m.apple_x = htonl(apple.x);
   m.apple_y = htonl(apple.y);
-  m.snake_len = htonl(snake_len);
+
+  m.snake_len = htonl(s->len);
   m.score = htonl(score);
 
-  int n = (int)send(cs, (const char *)&m, (int)sizeof(m), 0);
-  if (n <= 0) {
-    // If the client disappeared, drop it.
-#if defined(_WIN32)
-    int err = WSAGetLastError();
-    if (err != WSAEWOULDBLOCK) {
+  // Send header
+  if (!send_all_or_drop(cs, &m, (int)sizeof(m))) {
+    bot_drop_client(b);
+    return;
+  }
+
+  // Send payload: seg[0..len-1] as big-endian int32 pairs.
+  // Layout: x0 y0 x1 y1 ... (int32 each)
+  for (int i = 0; i < s->len; i++) {
+    int32_t x = htonl(s->seg[i].x);
+    int32_t y = htonl(s->seg[i].y);
+    if (!send_all_or_drop(cs, &x, (int)sizeof(x)) ||
+        !send_all_or_drop(cs, &y, (int)sizeof(y))) {
       bot_drop_client(b);
+      return;
     }
-#else
-    if (errno != EWOULDBLOCK && errno != EAGAIN) {
-      bot_drop_client(b);
-    }
-#endif
   }
 }
