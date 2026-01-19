@@ -104,25 +104,36 @@ jobs:
         run: |
           set -euo pipefail
 
-          TAG="${GITHUB_REF_NAME#v}"
-          echo "Extracting changelog for version $TAG"
+          RAW_TAG="${GITHUB_REF_NAME}"     # e.g. v1.0.0
+          VER="${RAW_TAG#v}"               # e.g. 1.0.0
 
-          awk -v ver="$TAG" '
+          echo "Extracting changelog for tag '$RAW_TAG' (version '$VER')"
+
+          echo "Changelog headings found:"
+          grep -nE '^## \[' CHANGELOG.md || true
+
+          # Match "## [1.0.0]" or "## [v1.0.0]" with optional " - ..." after it.
+          awk -v ver="$VER" -v tag="$RAW_TAG" '
             BEGIN { found=0 }
-            $0 ~ "^## \\[" ver "\\]" { found=1 }
-            found && $0 ~ "^## \\[" && NR!=start { exit }
-            found { print }
+            {
+              line=$0
+              if (!found && (line ~ ("^## \\[" ver "\\]") || line ~ ("^## \\[" tag "\\]"))) {
+                found=1
+              } else if (found && line ~ "^## \\[") {
+                exit
+              }
+              if (found) print
+            }
           ' CHANGELOG.md > RELEASE_NOTES.md
 
           if [ ! -s RELEASE_NOTES.md ]; then
-            echo "ERROR: No changelog section found for version $TAG"
+            echo "ERROR: No changelog section found for '$RAW_TAG' or '$VER'"
             exit 1
           fi
 
           echo "Generated release notes:"
           echo "------------------------"
           cat RELEASE_NOTES.md
-
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
