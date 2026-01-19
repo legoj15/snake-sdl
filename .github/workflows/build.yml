@@ -43,6 +43,19 @@ jobs:
       - name: Setup CMake + Ninja
         uses: lukka/get-cmake@latest
 
+      # IMPORTANT: Force MSVC toolchain on Windows so it matches x64-windows-static
+      - name: Setup MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      # Optional: strip MinGW from PATH in case something installs it
+      - name: De-Mingw PATH (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $p = $env:Path -split ';' | Where-Object { $_ -notmatch 'mingw64\\bin' }
+          "Path=$($p -join ';')" | Out-File -FilePath $env:GITHUB_ENV -Append
+
       - name: Setup vcpkg (manifest mode + caching)
         uses: lukka/run-vcpkg@v11
         with:
@@ -56,6 +69,15 @@ jobs:
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
           -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+      # Sanity check: confirm compiler choice (Windows should say cl/MSVC)
+      - name: Compiler sanity check (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmake -LA -N -B build |
+            Select-String -Pattern "CMAKE_C_COMPILER:|CMAKE_C_COMPILER_ID:|CMAKE_CXX_COMPILER:|CMAKE_CXX_COMPILER_ID:" |
+            ForEach-Object { $_.Line }
 
       - name: Build
         run: cmake --build build --parallel
