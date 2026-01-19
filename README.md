@@ -113,18 +113,14 @@ sudo apt-get update
 sudo apt-get install -y \
   autoconf autoconf-archive automake libtool \
   pkg-config python3-venv libltdl-dev \
-  \
   # X11 + input
   libx11-dev libxext-dev libxrandr-dev libxrender-dev libxss-dev \
   libxcursor-dev libxi-dev libxinerama-dev libxkbcommon-dev \
   libsm-dev libice-dev libxtst-dev \
-  \
   # Wayland
   libwayland-dev wayland-protocols libdecor-0-dev \
-  \
   # OpenGL / EGL
   libegl1-mesa-dev libgl1-mesa-dev \
-  \
   # Audio
   libasound2-dev
 
