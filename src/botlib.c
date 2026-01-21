@@ -621,6 +621,7 @@ static int gen_cycle_maze(int w, int h, unsigned int seed, bool wrap,
 }
 
 // Generate into out_dirs (size w*h). Returns 0 on success.
+// Apply valid edge swaps to mutate an existing Hamiltonian cycle.
 static int scramble_cycle(int w, int h, int *next, bool wrap,
                           unsigned int seed, char *err, int err_len) {
   int n = w * h;
@@ -742,6 +743,7 @@ static int gen_cycle_letters(int w, int h, unsigned int seed, CycleType type,
   return gen_cycle_by_type(w, h, seed, wrap, type, out_dirs, err, err_len);
 }
 
+// Try non-wrapping first; if invalid, retry with wrapping and return that.
 static int gen_cycle_letters_with_fallback(int w, int h, unsigned int seed,
                                            CycleType type, bool *out_wrap,
                                            char *out_dirs, char *err,

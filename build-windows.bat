@@ -87,7 +87,7 @@ if errorlevel 1 (
 )
 call "%VENV_DIR%\Scripts\activate.bat"
 python -m pip install --upgrade pip >nul
-python -m pip install -r launcher\requirements.txt nuitka >nul
+python -m pip install -r launcher\requirements.txt >nul
 
 echo Building launcher...
 python -m nuitka --standalone --assume-yes-for-downloads --lto=no --enable-plugin=tk-inter --include-package=customtkinter --output-dir="%BUILD_DIR%" --output-filename=launcher launcher\main.py
@@ -98,8 +98,9 @@ if exist "%DIST_DIR%" (
     xcopy /E /I /Y "%DIST_DIR%\*" "%BUILD_DIR%\" >nul
     rmdir /s /q "%DIST_DIR%"
 )
-
-
+if exist "launcher\readme.txt" (
+    copy /Y "launcher\readme.txt" "%BUILD_DIR%\readme.txt" >nul
+)
 
 if exist "%BUILD_DIR%\snake.exe" (
     move /Y "%BUILD_DIR%\snake.exe" "%GAME_DIR%\snake.exe" >nul

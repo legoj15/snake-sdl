@@ -235,6 +235,7 @@ static int free_neighbors_after(const Bot *b, IVec2 pos, int tail_idx,
   return count;
 }
 
+// Rank a candidate move; higher is better. Safety gates are handled outside.
 static double score_move(const Bot *b, const BotTuning *t, int head_idx,
                          int tail_idx, int target, int gap, int max_skip,
                          int len, IVec2 pos, const Apple *a, bool tail_free,
@@ -639,7 +640,7 @@ void Bot_OnTick(Bot *b, Snake *s, const Apple *a) {
   if (b->n_cells <= 0)
     return;
 
-  // Refresh occupancy each tick (O(L) where L is snake length).
+  // Refresh occupancy each tick (O(L) where L is snake length) for safety checks.
   memset(b->occupied_idx, 0, (size_t)b->n_cells);
   for (int i = 0; i < s->len; i++) {
     int seg_i = cell_index(b->grid_w, s->seg[i].x, s->seg[i].y);
@@ -719,6 +720,7 @@ void Bot_OnTick(Bot *b, Snake *s, const Apple *a) {
   }
 
   if (!have_choice) {
+    // No safe shortcut; fall back to the Hamiltonian ordering.
     int next_idx = b->next_cycle_idx[pos];
     IVec2 next_pos = b->pos_of_idx[next_idx];
     best_dir = dir_from_to_wrap(head, next_pos, b->grid_w, b->grid_h);

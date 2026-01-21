@@ -194,7 +194,7 @@ void SnakeDraw_Render(const App* app, const Snake* snake, float alpha, SnakeDraw
         centers_px[i] = grid_to_px_center(app, gx, gy);
     }
 
-    // Bridges first so segments sit on top
+    // Bridges first so segments sit on top and wrap seams look continuous.
     if (style.draw_bridges) {
         for (int i = 1; i < n; i++) {
             int dx = wrap_delta_i(snake->prev[i - 1].x, snake->seg[i - 1].x, snake->grid_w);

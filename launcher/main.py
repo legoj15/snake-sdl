@@ -11,6 +11,7 @@ from botlib import SnakeBotLib
 
 
 class ScrollableFrame(ctk.CTkFrame):
+    # Custom scroll container so the launcher remains usable on small windows.
     def __init__(self, master: ctk.CTk, **kwargs) -> None:
         super().__init__(master, **kwargs)
 
@@ -28,7 +29,9 @@ class ScrollableFrame(ctk.CTkFrame):
         self.grid_rowconfigure(0, weight=1)
 
         self.frame = ctk.CTkFrame(self)
-        self._window = self._canvas.create_window((0, 0), window=self.frame, anchor="nw")
+        self._window = self._canvas.create_window(
+            (0, 0), window=self.frame, anchor="nw"
+        )
 
         self.frame.bind("<Configure>", self._on_frame_configure)
         self._canvas.bind("<Configure>", self._on_canvas_configure)
@@ -84,6 +87,34 @@ class ScrollableFrame(ctk.CTkFrame):
         y0, _y1 = self._canvas.yview()
         if y0 < 0.0:
             self._canvas.yview_moveto(0.0)
+
+
+class ToolTip:
+    # Lightweight hover tooltip for slider labels.
+    def __init__(self, widget: ctk.CTkBaseClass, text: str) -> None:
+        self.widget = widget
+        self.text = text
+        self._tip: ctk.CTkToplevel | None = None
+        self.widget.bind("<Enter>", self._show)
+        self.widget.bind("<Leave>", self._hide)
+
+    def _show(self, _event=None) -> None:
+        if self._tip is not None or not self.text:
+            return
+        self._tip = ctk.CTkToplevel(self.widget)
+        self._tip.overrideredirect(True)
+        self._tip.attributes("-topmost", True)
+        label = ctk.CTkLabel(self._tip, text=self.text, justify="left")
+        label.pack(padx=8, pady=6)
+        x = self.widget.winfo_rootx() + 16
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 6
+        self._tip.geometry(f"+{x}+{y}")
+
+    def _hide(self, _event=None) -> None:
+        if self._tip is None:
+            return
+        self._tip.destroy()
+        self._tip = None
 
 
 class App(ctk.CTk):
@@ -189,6 +220,26 @@ class App(ctk.CTk):
                 "aggression_scale": 0.8,
                 "max_skip_cap": 0,
             },
+        }
+        self.tuning_display_names = {
+            "k_progress": "Progress reward",
+            "k_away": "Away penalty",
+            "k_skip": "Skip bonus",
+            "k_slack": "Slack penalty",
+            "k_loop": "Loop penalty",
+            "loop_window": "Loop window (ticks)",
+            "aggression_scale": "Aggression scale",
+            "max_skip_cap": "Max skip cap",
+        }
+        self.tuning_tooltips = {
+            "k_progress": "Rewards moves that advance along the cycle toward the apple.",
+            "k_away": "Penalty when a move reduces progress toward the apple.",
+            "k_skip": "Bonus for safe multi-step skips ahead on the cycle.",
+            "k_slack": "Penalty for consuming too much head-to-tail slack.",
+            "k_loop": "Penalty for revisiting recent cycle positions.",
+            "loop_window": "How many ticks a position stays 'recent' for loop penalty.",
+            "aggression_scale": "Scales how aggressive early-game shortcutting is.",
+            "max_skip_cap": "Hard cap on skip distance (0 = no cap).",
         }
         self.preset_var = ctk.StringVar(value="Safe")
         self.last_preset = "Safe"
@@ -515,6 +566,7 @@ class App(ctk.CTk):
         self.bot_tps_value.configure(text=str(self.bot_tps_steps[idx]))
 
     def _window_for_grid(self, w: int, h: int) -> tuple[int, int]:
+        # Match in-game sizing rules: 20px base cell size with 1080p cap.
         base_cell = 20
         max_dim = max(w, h)
         cell = base_cell
@@ -534,8 +586,12 @@ class App(ctk.CTk):
         fmt: str,
         is_int: bool = False,
     ) -> int:
-        label = ctk.CTkLabel(parent, text=key)
+        display_name = self.tuning_display_names.get(key, key)
+        label = ctk.CTkLabel(parent, text=display_name)
         label.grid(row=row, column=0, sticky="w", padx=10, pady=(0, 4))
+        tooltip = self.tuning_tooltips.get(key, "")
+        if tooltip:
+            ToolTip(label, tooltip)
 
         value_label = ctk.CTkLabel(parent, text=fmt.format(var.get()))
         value_label.grid(row=row, column=1, sticky="w", padx=10, pady=(0, 4))
@@ -645,6 +701,7 @@ class App(ctk.CTk):
             self.preset_var.set("Custom")
 
     def _find_game_executable(self) -> Path:
+        # Look relative to the launcher so bundled releases work without PATH.
         here = Path(__file__).resolve().parent
         if os.name == "nt":
             candidates = [

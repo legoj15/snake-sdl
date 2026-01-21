@@ -19,6 +19,7 @@
  */
 
 typedef struct BotTuning {
+  // Scoring weights for shortcut selection (safety checks remain enforced).
   double k_progress;
   double k_away;
   double k_skip;

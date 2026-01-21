@@ -72,6 +72,7 @@ jobs:
           Copy-Item "build\\launcher.exe" $pkg
           Copy-Item "build\\snakebot.dll" $pkg
           Copy-Item "build\\game" $pkg -Recurse
+          if (Test-Path "build\\readme.txt") { Copy-Item "build\\readme.txt" $pkg }
           $zip = "dist\\snake-windows.zip"
           if (Test-Path $zip) { Remove-Item $zip }
           Compress-Archive -Path "$pkg\\*" -DestinationPath $zip
@@ -148,6 +149,7 @@ jobs:
           cp -a build/launcher dist/package-linux/
           cp -a build/libsnakebot.so dist/package-linux/
           cp -a build/game dist/package-linux/
+          if [ -f build/readme.txt ]; then cp -a build/readme.txt dist/package-linux/; fi
           (cd dist/package-linux && zip -r ../snake-linux.zip .)
 
       - name: Upload artifact (Linux)

@@ -325,6 +325,7 @@ int main(int argc, char **argv) {
   const char *bot_cycle_path = NULL;
   BotTuning bot_tuning = {0};
   apply_preset(PRESET_SAFE, &bot_tuning);
+  // Human-mode overrides; keep defaults unless explicitly set.
   int cli_grid_w = GRID_W;
   int cli_grid_h = GRID_H;
   unsigned int cli_seed = 0;
@@ -445,6 +446,7 @@ int main(int argc, char **argv) {
   if (bot_enabled) {
     SDL_srand((Uint64)meta.seed);
   } else if (cli_seed_set) {
+    // Optional deterministic seed for human-mode launches.
     if (cli_seed == 0) {
       SDL_Log("Seed must be a positive integer.");
       App_Shutdown(&app);

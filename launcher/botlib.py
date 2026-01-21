@@ -14,6 +14,7 @@ def _default_lib_name() -> str:
 
 
 class SnakeBotLib:
+    # Thin ctypes wrapper around the snakebot shared library for cycle gen/validation.
     def __init__(self, dll_path: str | os.PathLike[str] | None = None) -> None:
         if dll_path is None:
             # Prefer loading from the GUI executable directory (Nuitka onefile/standalone)

@@ -76,7 +76,7 @@ VENV_DIR="launcher/.venv-build"
 "$PYTHON_BIN" -m venv "$VENV_DIR"
 source "$VENV_DIR/bin/activate"
 python -m pip install --upgrade pip >/dev/null
-python -m pip install -r launcher/requirements.txt nuitka >/dev/null
+python -m pip install -r launcher/requirements.txt >/dev/null
 
 echo "Building launcher..."
 python -m nuitka --standalone --assume-yes-for-downloads --lto=no --enable-plugin=tk-inter --include-package=customtkinter --output-dir="$BUILD_DIR" --output-filename=launcher launcher/main.py
@@ -85,6 +85,10 @@ DIST_DIR="${BUILD_DIR}/main.dist"
 if [[ -d "$DIST_DIR" ]]; then
   cp -a "$DIST_DIR"/. "$BUILD_DIR"/
   rm -rf "$DIST_DIR"
+fi
+
+if [[ -f "launcher/readme.txt" ]]; then
+  cp -a "launcher/readme.txt" "${BUILD_DIR}/readme.txt"
 fi
 
 if [[ -f "${BUILD_DIR}/snake" ]]; then
