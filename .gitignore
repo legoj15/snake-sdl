@@ -3,6 +3,10 @@ build/
 cmake-build-*/
 out/
 dist/
+customtkinter/
+tcl/
+tk/
+.venv*/
 
 # CMake
 CMakeCache.txt
@@ -21,11 +25,12 @@ vcpkg/downloads/
 *.obj
 *.a
 *.lib
-*.so
+*.so*
 *.dll
 *.dylib
 *.exe
 *.pdb
+*.bin
 
 # Editor/IDE
 .vscode/
@@ -39,3 +44,5 @@ Thumbs.db
 # SDL3 Headers
 include/SDL3
 lib/SDL3
+
+notes.txt

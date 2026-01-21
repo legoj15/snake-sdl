@@ -1,6 +1,6 @@
 #include "snake_draw.h"
 #include <math.h>
-#include <stdlib.h> 
+#include <stdlib.h>
 #include <stdbool.h>
 
 

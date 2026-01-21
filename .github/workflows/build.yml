@@ -9,49 +9,23 @@ on:
       - 'v*'
 
 jobs:
-  build:
-    name: ${{ matrix.os }} (Release, ${{ matrix.triplet }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            triplet: x64-windows-static
-          - os: ubuntu-latest
-            triplet: x64-linux
-
+  build-windows:
+    name: Windows (Release)
+    runs-on: windows-latest
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}\vcpkg
+      VCPKG_TARGET_TRIPLET: x64-windows-static
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Install Linux build deps (Ubuntu)
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y \
-            autoconf autoconf-archive automake libtool \
-            pkg-config \
-            python3-venv libltdl-dev \
-            libx11-dev libxext-dev libxrandr-dev libxrender-dev libxss-dev \
-            libxcursor-dev libxi-dev libxinerama-dev libxkbcommon-dev \
-            libsm-dev libice-dev \
-            libxtst-dev \
-            libwayland-dev wayland-protocols libdecor-0-dev \
-            libegl1-mesa-dev libgl1-mesa-dev \
-            libasound2-dev
 
       - name: Setup CMake + Ninja
         uses: lukka/get-cmake@latest
 
       - name: Setup MSVC (Windows)
-        if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
 
       - name: De-Mingw PATH (Windows)
-        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $p = $env:Path -split ';' | Where-Object { $_ -notmatch 'mingw64\\bin' }
@@ -63,43 +37,136 @@ jobs:
           vcpkgJsonGlob: '**/vcpkg.json'
           vcpkgDirectory: '${{ github.workspace }}/vcpkg'
 
-      - name: Configure
-        run: >
-          cmake -S . -B build
-          -G Ninja
-          -DCMAKE_BUILD_TYPE=Release
-          -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
-          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+      - name: Build (Windows)
+        shell: cmd
+        run: build-windows.bat release
 
-      - name: Compiler sanity check (Windows)
-        if: runner.os == 'Windows'
+      - name: Verify layout
         shell: pwsh
         run: |
-          cmake -LA -N -B build |
-            Select-String -Pattern "CMAKE_C_COMPILER:|CMAKE_C_COMPILER_ID:|CMAKE_CXX_COMPILER:|CMAKE_CXX_COMPILER_ID:" |
-            ForEach-Object { $_.Line }
+          if (!(Test-Path "build\\launcher.exe")) { throw "Missing build\\launcher.exe" }
+          if (!(Test-Path "build\\snakebot.dll")) { throw "Missing build\\snakebot.dll" }
+          if (!(Test-Path "build\\game\\snake.exe")) { throw "Missing build\\game\\snake.exe" }
 
-      - name: Build
-        run: cmake --build build --parallel
+      - name: Rename binaries
+        shell: pwsh
+        run: |
+          Move-Item -Force "build\\game\\snake.exe" "build\\game\\snake-windows.exe"
+
+      - name: Package zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $pkg = "dist\\package-windows"
+          if (Test-Path $pkg) { Remove-Item -Recurse -Force $pkg }
+          New-Item -ItemType Directory -Force -Path $pkg | Out-Null
+          Copy-Item "build\\launcher.exe" $pkg
+          Copy-Item "build\\snakebot.dll" $pkg
+          Copy-Item "build\\game" $pkg -Recurse
+          $zip = "dist\\snake-windows.zip"
+          if (Test-Path $zip) { Remove-Item $zip }
+          Compress-Archive -Path "$pkg\\*" -DestinationPath $zip
+
+      - name: Upload artifact (Windows)
+        uses: actions/upload-artifact@v4
+        with:
+          name: snake-windows-zip
+          path: dist/snake-windows.zip
+
+  build-linux:
+    name: Linux (Release)
+    runs-on: ubuntu-latest
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      VCPKG_TARGET_TRIPLET: x64-linux
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux build deps (Ubuntu)
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            autoconf autoconf-archive automake libtool \
+            pkg-config zip \
+            python3-venv python3-dev python3-tk patchelf libltdl-dev \
+            libx11-dev libxext-dev libxrandr-dev libxrender-dev libxss-dev \
+            libxcursor-dev libxi-dev libxinerama-dev libxkbcommon-dev \
+            libsm-dev libice-dev \
+            libxtst-dev \
+            libwayland-dev wayland-protocols libdecor-0-dev \
+            libegl1-mesa-dev libgl1-mesa-dev \
+            libasound2-dev
+
+      - name: Setup CMake + Ninja
+        uses: lukka/get-cmake@latest
+
+      - name: Setup vcpkg (manifest mode + caching)
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: '**/vcpkg.json'
+          vcpkgDirectory: '${{ github.workspace }}/vcpkg'
+
+      - name: Build (Linux)
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x build.sh
+          ./build.sh release
+
+      - name: Verify layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f build/launcher
+          test -f build/libsnakebot.so
+          test -f build/game/snake
 
       - name: Rename binaries
         shell: bash
         run: |
           set -euo pipefail
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            test -f build/snake.exe
-            mv build/snake.exe build/snake-windows.exe
-          else
-            test -f build/snake
-            mv build/snake build/snake-linux
-          fi
+          mv build/game/snake build/game/snake-linux
+
+      - name: Package zip
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf dist/package-linux
+          mkdir -p dist/package-linux
+          cp -a build/launcher dist/package-linux/
+          cp -a build/libsnakebot.so dist/package-linux/
+          cp -a build/game dist/package-linux/
+          (cd dist/package-linux && zip -r ../snake-linux.zip .)
+
+      - name: Upload artifact (Linux)
+        uses: actions/upload-artifact@v4
+        with:
+          name: snake-linux-zip
+          path: dist/snake-linux.zip
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: [build-windows, build-linux]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
 
       - name: Extract changelog for release
         shell: bash
         run: |
           set -euo pipefail
-          RAW_TAG="${GITHUB_REF_NAME}"     # e.g. v1.0.0
-          VER="${RAW_TAG#v}"               # e.g. 1.0.0
+          RAW_TAG="${GITHUB_REF_NAME}"
+          VER="${RAW_TAG#v}"
 
           echo "Extracting changelog for tag '$RAW_TAG' (version '$VER')"
           echo "Changelog headings found:"
@@ -124,6 +191,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            build/snake-windows.exe
-            build/snake-linux
+            dist/snake-windows.zip
+            dist/snake-linux.zip
           body_path: RELEASE_NOTES.md

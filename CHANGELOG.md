@@ -17,6 +17,28 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - 
 
 
+## [2.0.0] - 2026-01-21
+
+### Added
+- A Bot that always wins
+- Bot launcher with presets and tuning sliders with reset controls.
+- Multiple Hamiltonian cycle types (serpentine, spiral, maze, scrambled) with wrap fallback validation.
+- Human-mode launcher tab with custom grid size and optional seed.
+- Auto window sizing with 1080p cap and grid cell scaling.
+- Discrete bot TPS steps with live value display.
+
+### Changed
+- Build output layout now uses `build/launcher(.exe)` and `build/game/snake(.exe)`.
+- Build scripts now install vcpkg deps, build the game + launcher, and package the launcher with dependencies.
+- Launcher folder renamed from `bot_gui` to `launcher`.
+- CI builds now run the scripts, verify layout, package zips, and attach release notes from the changelog.
+
+### Fixed
+- Grid toggle stays available during win/death states.
+- Win screen fills the last cell correctly when the snake reaches full length.
+- Bot behavior handles length 1 without forced cycle fallback.
+
+
 ## [1.0.0] - 2026-01-18
 
 ### Added
@@ -26,5 +48,6 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Apple spawning and body growth.
 - Optional snapped head rendering style.
 
-[Unreleased]: https://github.com/ManifestJW/snake-sdl/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/ManifestJW/snake-sdl/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.0.0
 [1.0.0]: https://github.com/ManifestJW/snake-sdl/releases/tag/v1.0.0

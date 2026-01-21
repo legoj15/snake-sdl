@@ -2,10 +2,10 @@
 setlocal EnableExtensions EnableDelayedExpansion
 
 REM ============================
-REM Defaults (kept for symmetry / future use)
+REM Defaults
 REM ============================
 if not defined BUILD_DIR set BUILD_DIR=build
-if not defined BUILD_TYPE set BUILD_TYPE=Debug
+set "GAME_DIR=%BUILD_DIR%\game"
 
 REM ============================
 REM Resolve vcpkg toolchain
@@ -33,11 +33,21 @@ if not exist "%TOOLCHAIN%" (
 )
 
 REM ============================
-REM Optional triplet
+REM Install vcpkg dependencies
 REM ============================
-REM Your preset should read VCPKG_TARGET_TRIPLET if you want this to matter.
-REM Example: set VCPKG_TARGET_TRIPLET=x64-windows-static
-REM (No action needed here if it's already set in the environment.)
+if defined VCPKG_ROOT (
+    if exist "%VCPKG_ROOT%\vcpkg.exe" (
+        echo Installing vcpkg dependencies...
+        if defined VCPKG_TARGET_TRIPLET (
+            "%VCPKG_ROOT%\vcpkg.exe" install --triplet "%VCPKG_TARGET_TRIPLET%" --x-install-root "%BUILD_DIR%\vcpkg_installed"
+        ) else (
+            "%VCPKG_ROOT%\vcpkg.exe" install --x-install-root "%BUILD_DIR%\vcpkg_installed"
+        )
+        if errorlevel 1 exit /b 1
+    ) else (
+        echo WARN: vcpkg executable not found at %VCPKG_ROOT%\vcpkg.exe (skipping install)
+    )
+)
 
 REM ============================
 REM Configure + Build using presets
@@ -51,4 +61,50 @@ if errorlevel 1 exit /b 1
 cmake --build --preset "%PRESET%" --parallel
 if errorlevel 1 exit /b 1
 
-echo Built: .\%BUILD_DIR%\snake.exe
+REM ============================
+REM Build GUI (Nuitka standalone)
+REM ============================
+if exist "%GAME_DIR%" rmdir /s /q "%GAME_DIR%"
+mkdir "%GAME_DIR%"
+
+set "VENV_DIR=launcher\.venv-build"
+set "PYTHON_BIN=py"
+%PYTHON_BIN% -3 --version >nul 2>&1
+if errorlevel 1 (
+    set "PYTHON_BIN=python"
+)
+
+if "%PYTHON_BIN%"=="py" (
+    %PYTHON_BIN% -3 -m venv "%VENV_DIR%"
+) else (
+    %PYTHON_BIN% -m venv "%VENV_DIR%"
+)
+if errorlevel 1 (
+    echo ERROR: Python 3 not found. Install Python and retry.
+    exit /b 1
+)
+call "%VENV_DIR%\Scripts\activate.bat"
+python -m pip install --upgrade pip >nul
+python -m pip install -r launcher\requirements.txt nuitka >nul
+
+echo Building launcher...
+python -m nuitka --standalone --lto=no --enable-plugin=tk-inter --include-package=customtkinter --output-dir="%BUILD_DIR%" --output-filename=launcher launcher\main.py
+if errorlevel 1 exit /b 1
+
+set "DIST_DIR=%BUILD_DIR%\main.dist"
+if exist "%DIST_DIR%" (
+    xcopy /E /I /Y "%DIST_DIR%\*" "%BUILD_DIR%\" >nul
+    rmdir /s /q "%DIST_DIR%"
+)
+
+
+
+if exist "%BUILD_DIR%\snake.exe" (
+    move /Y "%BUILD_DIR%\snake.exe" "%GAME_DIR%\snake.exe" >nul
+) else (
+    echo ERROR: missing %BUILD_DIR%\snake.exe
+    exit /b 1
+)
+
+echo Built: .\%BUILD_DIR%\launcher.exe
+echo Built: .\%GAME_DIR%\snake.exe

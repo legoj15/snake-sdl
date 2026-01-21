@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "app.h"
 #include "apple.h"
@@ -19,10 +20,10 @@
  * Tick rate ramps with score; render rate is capped separately.
  */
 
-#define WINDOW_W 800
-#define WINDOW_H 600
 #define GRID_W 40
 #define GRID_H 30
+#define BASE_CELL_SIZE 20
+#define MAX_WINDOW_DIM 1080
 
 #define BASE_TICK_HZ 7
 #define RAMP_EVERY 3
@@ -30,11 +31,11 @@
 
 #define RENDER_CAP_HZ 240
 
-#define DEBUG_START_LONG 0
-#define DEBUG_START_LEN 20
-
 // Above this TPS, disable "snappy head" and interpolate the whole snake
 #define FULL_INTERP_TPS 12
+
+// Above this TPS (bot mode), disable interpolation entirely.
+#define BOT_INTERP_CUTOFF_TPS 120
 
 static inline uint64_t ns_from_hz(int hz) {
   return (hz > 0) ? (1000000000ull / (uint64_t)hz) : 0;
@@ -50,6 +51,27 @@ static inline int clampi(int v, int lo, int hi) {
   if (v > hi)
     return hi;
   return v;
+}
+
+static int cell_size_for_grid(int grid_w, int grid_h) {
+  int max_dim = (grid_w > grid_h) ? grid_w : grid_h;
+  int cell = BASE_CELL_SIZE;
+  if (max_dim <= 0)
+    return cell;
+  if (max_dim * cell > MAX_WINDOW_DIM) {
+    cell = MAX_WINDOW_DIM / max_dim;
+    if (cell < 1)
+      cell = 1;
+  }
+  return cell;
+}
+
+static void window_for_grid(int grid_w, int grid_h, int *out_w, int *out_h) {
+  int cell = cell_size_for_grid(grid_w, grid_h);
+  if (out_w)
+    *out_w = grid_w * cell;
+  if (out_h)
+    *out_h = grid_h * cell;
 }
 
 static int tick_hz_for_score(int score) {
@@ -69,69 +91,28 @@ static bool snake_hit_self(const Snake *s) {
   return false;
 }
 
-static void debug_make_snake_long(Snake *s, int desired_len) {
-  if (!s || !s->seg || !s->prev)
+static void Snake_ForceWinFill(Snake *s) {
+  if (!s)
     return;
-
-  int len = desired_len;
-  if (len < 1)
-    len = 1;
-  if (len > s->max_len)
-    len = s->max_len;
-
-  IVec2 head = s->seg[0];
-
-  int bx = 0, by = 0;
-  switch (s->dir) {
-  case DIR_UP:
-    by = 1;
-    break;
-  case DIR_DOWN:
-    by = -1;
-    break;
-  case DIR_LEFT:
-    bx = 1;
-    break;
-  case DIR_RIGHT:
-    bx = -1;
-    break;
+  while (s->grow > 0 && s->len < s->max_len) {
+    IVec2 tail_prev = s->prev[s->len - 1];
+    s->seg[s->len] = tail_prev;
+    s->prev[s->len] = tail_prev;
+    s->len += 1;
+    s->grow -= 1;
   }
-
-  s->len = len;
-  for (int i = 0; i < s->len; i++) {
-    int x = head.x + bx * i;
-    int y = head.y + by * i;
-
-    while (x < 0)
-      x += s->grid_w;
-    while (x >= s->grid_w)
-      x -= s->grid_w;
-    while (y < 0)
-      y += s->grid_h;
-    while (y >= s->grid_h)
-      y -= s->grid_h;
-
-    s->seg[i].x = x;
-    s->seg[i].y = y;
-    s->prev[i] = s->seg[i];
-  }
-
-  s->grow = 0;
 }
 
 static void Game_Reset(Snake *snake, Apple *apple, int *score, int *tick_hz,
                        uint64_t *tick_ns, uint64_t *acc, bool *game_over,
                        bool *you_win, bool *interp, bool interp_setting,
-                       DeathFx *death_fx, const App *app) {
+                       DeathFx *death_fx, const App *app, bool bot_enabled,
+                       int bot_tps) {
   Snake_Destroy(snake);
 
   Dir start_dir = (Dir)SDL_rand(4);
   Snake_Init(snake, app->grid_w, app->grid_h, app->grid_w * app->grid_h,
              start_dir);
-
-#if DEBUG_START_LONG
-  debug_make_snake_long(snake, DEBUG_START_LEN);
-#endif
 
   *score = snake->len - 1;
   if (*score < 0)
@@ -139,7 +120,8 @@ static void Game_Reset(Snake *snake, Apple *apple, int *score, int *tick_hz,
 
   Apple_Init(apple, snake);
 
-  *tick_hz = tick_hz_for_score(*score);
+  *tick_hz =
+      (bot_enabled && bot_tps > 0) ? bot_tps : tick_hz_for_score(*score);
   *tick_ns = ns_from_hz(*tick_hz);
   *acc = 0;
 
@@ -168,42 +150,314 @@ static void SetEndTitle(SDL_Window *window, bool you_win, int score) {
   SDL_SetWindowTitle(window, title);
 }
 
-int main(void) {
-  App app = {0};
-  if (!App_Init(&app, WINDOW_W, WINDOW_H, GRID_W, GRID_H)) {
-    return 1;
+static bool arg_eq(const char *a, const char *b) {
+  return a && b && strcmp(a, b) == 0;
+}
+
+static bool parse_preset_name(const char *name, Preset *out) {
+  if (!name || !out)
+    return false;
+  if (strcmp(name, "safe") == 0) {
+    *out = PRESET_SAFE;
+    return true;
+  }
+  if (strcmp(name, "aggressive") == 0) {
+    *out = PRESET_AGGRESSIVE;
+    return true;
+  }
+  if (strcmp(name, "greedy") == 0 || strcmp(name, "greedy-apple") == 0 ||
+      strcmp(name, "greedy_apple") == 0) {
+    *out = PRESET_GREEDY_APPLE;
+    return true;
+  }
+  if (strcmp(name, "chaotic") == 0) {
+    *out = PRESET_CHAOTIC;
+    return true;
+  }
+  return false;
+}
+
+typedef struct CycleMeta {
+  int grid_w;
+  int grid_h;
+  int window_w;
+  int window_h;
+  unsigned int seed;
+} CycleMeta;
+
+static bool parse_cycle_meta(const char *path, CycleMeta *out, char *err,
+                             int err_len) {
+  if (!path || !out) {
+    snprintf(err, (size_t)err_len, "invalid cycle path");
+    return false;
   }
 
-  // ------------------------------------------------------------
-  // Optional bot server (disabled by default)
-  // Enable with:
-  //   SNAKE_BOT=1 [SNAKE_BOT_PORT=5555] ./snake
-  // ------------------------------------------------------------
-  bool bot_enable = false;
-  uint16_t bot_port = 5555;
-
-  const char *bot_env = getenv("SNAKE_BOT");
-  if (bot_env && bot_env[0] != '\0' && bot_env[0] != '0') {
-    bot_enable = true;
+  FILE *f = fopen(path, "rb");
+  if (!f) {
+    snprintf(err, (size_t)err_len, "failed to open cycle file");
+    return false;
   }
 
-  const char *port_env = getenv("SNAKE_BOT_PORT");
-  if (port_env && port_env[0] != '\0') {
-    unsigned long p = strtoul(port_env, NULL, 10);
-    if (p > 0 && p <= 65535) {
-      bot_port = (uint16_t)p;
+  fseek(f, 0, SEEK_END);
+  long sz = ftell(f);
+  fseek(f, 0, SEEK_SET);
+  if (sz <= 0) {
+    fclose(f);
+    snprintf(err, (size_t)err_len, "cycle file is empty");
+    return false;
+  }
+
+  char *buf = (char *)malloc((size_t)sz + 1);
+  if (!buf) {
+    fclose(f);
+    snprintf(err, (size_t)err_len, "out of memory reading cycle file");
+    return false;
+  }
+  size_t got = fread(buf, 1, (size_t)sz, f);
+  fclose(f);
+  buf[got] = '\0';
+
+  int grid_w = -1;
+  int grid_h = -1;
+  int window_w = -1;
+  int window_h = -1;
+  unsigned int seed = 0;
+
+  char *p = buf;
+  while (*p == '\r' || *p == '\n' || *p == ' ' || *p == '\t')
+    p++;
+  char *line_end = strpbrk(p, "\r\n");
+  if (!line_end) {
+    free(buf);
+    snprintf(err, (size_t)err_len, "cycle file missing header");
+    return false;
+  }
+  *line_end = '\0';
+  if (strcmp(p, "SNAKECYCLE 1") != 0) {
+    free(buf);
+    snprintf(err, (size_t)err_len, "cycle file header invalid");
+    return false;
+  }
+
+  p = line_end + 1;
+  while (*p) {
+    while (*p == '\r' || *p == '\n')
+      p++;
+    if (!*p)
+      break;
+
+    char *e = strpbrk(p, "\r\n");
+    if (e)
+      *e = '\0';
+
+    char *s = p;
+    while (*s == ' ' || *s == '\t')
+      s++;
+
+    if (*s == '\0' || *s == '#') {
+      // skip
+    } else if (strcmp(s, "DATA") == 0) {
+      break;
+    } else {
+      char *eq = strchr(s, '=');
+      if (eq) {
+        *eq = '\0';
+        char *key = s;
+        char *val = eq + 1;
+        while (*val == ' ' || *val == '\t')
+          val++;
+        int iv = atoi(val);
+        if (strcmp(key, "width") == 0)
+          grid_w = iv;
+        else if (strcmp(key, "height") == 0)
+          grid_h = iv;
+        else if (strcmp(key, "window_w") == 0)
+          window_w = iv;
+        else if (strcmp(key, "window_h") == 0)
+          window_h = iv;
+        else if (strcmp(key, "seed") == 0)
+          seed = (unsigned int)iv;
+      }
+    }
+
+    if (!e)
+      break;
+    p = e + 1;
+  }
+
+  free(buf);
+
+  if (grid_w <= 0 || grid_h <= 0) {
+    snprintf(err, (size_t)err_len, "cycle metadata missing dimensions");
+    return false;
+  }
+  if (grid_w < 2 || grid_h < 2) {
+    snprintf(err, (size_t)err_len, "grid width/height must be >= 2");
+    return false;
+  }
+  if (window_w > 0 && window_h > 0) {
+    if ((window_w % grid_w) != 0 || (window_h % grid_h) != 0) {
+      snprintf(err, (size_t)err_len,
+               "window size must be divisible by grid size");
+      return false;
+    }
+  }
+  if (seed == 0) {
+    snprintf(err, (size_t)err_len, "cycle seed is required");
+    return false;
+  }
+
+  out->grid_w = grid_w;
+  out->grid_h = grid_h;
+  out->window_w = window_w;
+  out->window_h = window_h;
+  out->seed = seed;
+  return true;
+}
+
+int main(int argc, char **argv) {
+  // ------------------------------
+  // Bot mode (off by default)
+  // ------------------------------
+  bool bot_enabled = false;
+  bool bot_gui = false;
+  int bot_tps = 0;
+  const char *bot_cycle_path = NULL;
+  BotTuning bot_tuning = {0};
+  apply_preset(PRESET_SAFE, &bot_tuning);
+  int cli_grid_w = GRID_W;
+  int cli_grid_h = GRID_H;
+  unsigned int cli_seed = 0;
+  bool cli_seed_set = false;
+
+  // CLI:
+  //   --bot                 enable bot mode
+  //   --bot-cycle <file>    optional .cycle container file (refused if not
+  //   .cycle)
+  for (int i = 1; i < argc; i++) {
+    if (arg_eq(argv[i], "--bot")) {
+      bot_enabled = true;
+    } else if (arg_eq(argv[i], "--bot-gui")) {
+      bot_gui = true;
+    } else if (arg_eq(argv[i], "--bot-cycle") && i + 1 < argc) {
+      bot_cycle_path = argv[i + 1];
+      i++;
+    } else if (arg_eq(argv[i], "--bot-tps") && i + 1 < argc) {
+      bot_tps = atoi(argv[i + 1]);
+      if (bot_tps > 7000) {
+        SDL_Log("Bot TPS cannot exceed 7000 (requested %d).", bot_tps);
+        bot_tps = -1;
+      }
+      if (bot_tps < 7) {
+        SDL_Log("Invalid bot TPS (%d); ignoring.", bot_tps);
+        bot_tps = -1;
+      }
+      i++;
+    } else if (arg_eq(argv[i], "--bot-preset") && i + 1 < argc) {
+      Preset p;
+      if (!parse_preset_name(argv[i + 1], &p)) {
+        SDL_Log("Unknown preset: %s", argv[i + 1]);
+        return 1;
+      }
+      apply_preset(p, &bot_tuning);
+      i++;
+    } else if (arg_eq(argv[i], "--bot-k-progress") && i + 1 < argc) {
+      bot_tuning.k_progress = strtod(argv[i + 1], NULL);
+      i++;
+    } else if (arg_eq(argv[i], "--bot-k-away") && i + 1 < argc) {
+      bot_tuning.k_away = strtod(argv[i + 1], NULL);
+      i++;
+    } else if (arg_eq(argv[i], "--bot-k-skip") && i + 1 < argc) {
+      bot_tuning.k_skip = strtod(argv[i + 1], NULL);
+      i++;
+    } else if (arg_eq(argv[i], "--bot-k-slack") && i + 1 < argc) {
+      bot_tuning.k_slack = strtod(argv[i + 1], NULL);
+      i++;
+    } else if (arg_eq(argv[i], "--bot-k-loop") && i + 1 < argc) {
+      bot_tuning.k_loop = strtod(argv[i + 1], NULL);
+      i++;
+    } else if (arg_eq(argv[i], "--bot-loop-window") && i + 1 < argc) {
+      bot_tuning.loop_window = atoi(argv[i + 1]);
+      i++;
+    } else if (arg_eq(argv[i], "--bot-aggression-scale") && i + 1 < argc) {
+      bot_tuning.aggression_scale = strtod(argv[i + 1], NULL);
+      i++;
+    } else if (arg_eq(argv[i], "--bot-max-skip-cap") && i + 1 < argc) {
+      bot_tuning.max_skip_cap = atoi(argv[i + 1]);
+      i++;
+    } else if (arg_eq(argv[i], "--grid-w") && i + 1 < argc) {
+      cli_grid_w = atoi(argv[i + 1]);
+      i++;
+    } else if (arg_eq(argv[i], "--grid-h") && i + 1 < argc) {
+      cli_grid_h = atoi(argv[i + 1]);
+      i++;
+    } else if (arg_eq(argv[i], "--seed") && i + 1 < argc) {
+      cli_seed = (unsigned int)atoi(argv[i + 1]);
+      cli_seed_set = true;
+      i++;
     }
   }
 
-  Bot bot;
-  if (!Bot_Init(&bot, bot_enable, bot_port)) {
-    // Bot is optional; failure should not kill the game.
-    Bot_Shutdown(&bot);
+  CycleMeta meta = {0};
+  if (bot_enabled) {
+    if (!bot_gui) {
+      SDL_Log("Bot mode requires GUI launch (--bot-gui).");
+      return 1;
+    }
+    if (!bot_cycle_path) {
+      SDL_Log("Bot mode requires --bot-cycle.");
+      return 1;
+    }
+    if (bot_tps <= 0) {
+      SDL_Log("Bot mode requires a valid --bot-tps (7..7000).");
+      return 1;
+    }
+    char meta_err[256];
+    if (!parse_cycle_meta(bot_cycle_path, &meta, meta_err,
+                          (int)sizeof(meta_err))) {
+      SDL_Log("Bot cycle metadata invalid: %s", meta_err);
+      return 1;
+    }
   }
-  // ------------------------------------------------------------
+
+  int init_grid_w = GRID_W;
+  int init_grid_h = GRID_H;
+  if (bot_enabled) {
+    init_grid_w = meta.grid_w;
+    init_grid_h = meta.grid_h;
+  } else {
+    init_grid_w = cli_grid_w;
+    init_grid_h = cli_grid_h;
+  }
+  if (init_grid_w < 2 || init_grid_h < 2) {
+    SDL_Log("Grid width/height must be >= 2.");
+    return 1;
+  }
+  int init_window_w = 0;
+  int init_window_h = 0;
+  window_for_grid(init_grid_w, init_grid_h, &init_window_w, &init_window_h);
+
+  App app = {0};
+  if (!App_Init(&app, init_window_w, init_window_h, init_grid_w, init_grid_h)) {
+    return 1;
+  }
+
+  if (bot_enabled) {
+    SDL_srand((Uint64)meta.seed);
+  } else if (cli_seed_set) {
+    if (cli_seed == 0) {
+      SDL_Log("Seed must be a positive integer.");
+      App_Shutdown(&app);
+      return 1;
+    }
+    SDL_srand((Uint64)cli_seed);
+  }
 
   bool running = true;
   bool show_grid = true;
+
+  Bot bot = {0};
+  bool bot_ready = false;
 
   // Render preference: whether we interpolate between ticks.
   // This is meant to be user-controlled and should survive resets.
@@ -215,9 +469,27 @@ int main(void) {
   Snake snake;
   if (!Snake_Init(&snake, app.grid_w, app.grid_h, app.grid_w * app.grid_h,
                   start_dir)) {
-    Bot_Shutdown(&bot);
     App_Shutdown(&app);
     return 1;
+  }
+
+  // Bot is embedded in-game, but only initialized/used when enabled.
+  if (bot_enabled) {
+    bot_ready = Bot_Init(&bot, app.grid_w, app.grid_h);
+    if (!bot_ready) {
+      SDL_Log("Bot_Init failed.");
+      App_Shutdown(&app);
+      return 1;
+    }
+    if (bot_cycle_path) {
+      if (!Bot_LoadCycleFromFile(&bot, bot_cycle_path)) {
+        SDL_Log("Bot cycle load failed (%s).", bot_cycle_path);
+        Bot_Destroy(&bot);
+        App_Shutdown(&app);
+        return 1;
+      }
+    }
+    Bot_SetTuning(&bot, &bot_tuning);
   }
 
 #if DEBUG_START_LONG
@@ -235,8 +507,13 @@ int main(void) {
 
   const uint64_t frame_ns = ns_from_hz(RENDER_CAP_HZ);
 
-  int tick_hz = tick_hz_for_score(score);
+  int tick_hz =
+      (bot_enabled && bot_tps > 0) ? bot_tps : tick_hz_for_score(score);
   uint64_t tick_ns = ns_from_hz(tick_hz);
+  if (bot_enabled && bot_tps >= BOT_INTERP_CUTOFF_TPS) {
+    interp_setting = false;
+    interp = false;
+  }
 
   uint64_t last = SDL_GetTicksNS();
   uint64_t acc = 0;
@@ -285,16 +562,17 @@ int main(void) {
     EventsFrame ev = {0};
     Events_Poll(&ev);
 
-    // Let a bot client connect at any time (non-blocking).
-    Bot_PollAccept(&bot);
-
     if (ev.quit)
       break;
 
     // Continue after win or game over
     if ((game_over || you_win) && ev.continue_game) {
       Game_Reset(&snake, &apple, &score, &tick_hz, &tick_ns, &acc, &game_over,
-                 &you_win, &interp, interp_setting, &death_fx, &app);
+                 &you_win, &interp, interp_setting, &death_fx, &app,
+                 bot_enabled, bot_tps);
+      if (bot_enabled && bot_ready) {
+        bot.cycle_pos = -1;
+      }
       continue;
     }
 
@@ -303,58 +581,58 @@ int main(void) {
     style_green.snap_head = !full_interp;
     style_blue.snap_head = !full_interp;
 
+    if (ev.toggle_grid)
+      show_grid = !show_grid;
+
     if (!game_over && !you_win) {
-      if (ev.toggle_grid)
-        show_grid = !show_grid;
       if (ev.toggle_interp) {
         // Keep both the live render flag and the "remembered" preference in
         // sync. We don't want end states (win/death) or resets to implicitly
         // flip it.
-        interp_setting = !interp_setting;
-        interp = interp_setting;
+        if (!(bot_enabled && bot_tps >= BOT_INTERP_CUTOFF_TPS)) {
+          interp_setting = !interp_setting;
+          interp = interp_setting;
+        }
       }
 
-      for (int i = 0; i < ev.dir_count; i++) {
-        Snake_QueueDir(&snake, ev.dirs[i]);
+      if (!bot_enabled) {
+        for (int i = 0; i < ev.dir_count; i++) {
+          Snake_QueueDir(&snake, ev.dirs[i]);
+        }
       }
 
       // Difficulty ramp: adjust tick rate based on current score.
-      int desired_hz = tick_hz_for_score(score);
-      if (desired_hz != tick_hz) {
-        uint64_t old_tick_ns = tick_ns;
+      if (!bot_enabled) {
+        int desired_hz = tick_hz_for_score(score);
+        if (desired_hz != tick_hz) {
+          uint64_t old_tick_ns = tick_ns;
 
-        tick_hz = desired_hz;
-        tick_ns = ns_from_hz(tick_hz);
+          tick_hz = desired_hz;
+          tick_ns = ns_from_hz(tick_hz);
 
-        // Rescale acc so the interpolation fraction stays consistent when
-        // tick_ns changes.
-        if (old_tick_ns > 0 && tick_ns > 0) {
-          double frac = (double)acc / (double)old_tick_ns;
-          acc = (uint64_t)(frac * (double)tick_ns);
+          // Rescale acc so the interpolation fraction stays consistent when
+          // tick_ns changes.
+          if (old_tick_ns > 0 && tick_ns > 0) {
+            double frac = (double)acc / (double)old_tick_ns;
+            acc = (uint64_t)(frac * (double)tick_ns);
+          }
+          if (acc > tick_ns * 4)
+            acc = tick_ns * 4;
         }
-        if (acc > tick_ns * 4)
-          acc = tick_ns * 4;
       }
 
       // Fixed-timestep update: consume whole ticks from the accumulator.
       while (acc >= tick_ns) {
-        // ----- BOT BRIDGE (tick-aligned) -----
-        // Send state (best effort, non-blocking)
-        Bot_SendState(&bot, &snake, apple.pos, score, game_over, you_win);
-
-        // Receive at most one bot direction per tick
-        Dir bot_dir;
-        if (Bot_TryRecvDir(&bot, &bot_dir)) {
-          Snake_QueueDir(&snake, bot_dir);
+        if (bot_enabled && bot_ready) {
+          Bot_OnTick(&bot, &snake, &apple);
         }
-        // ------------------------------------
-
         Snake_Tick(&snake);
 
         if (Apple_TryEatAndRespawn(&apple, &snake)) {
           score += 1;
 
           if (score >= max_score) {
+            Snake_ForceWinFill(&snake);
             you_win = true;
 
             // Freeze pose + mode on win so the final frame stays visually
@@ -392,6 +670,9 @@ int main(void) {
     Render_Clear(app.renderer);
 
     if (you_win) {
+      if (show_grid) {
+        Render_GridLinesEx(&app, 40, 40, 40, 120);
+      }
       SnakeDraw_Render(&app, &snake, freeze_alpha, style_blue);
     } else if (game_over) {
       if (show_grid) {
@@ -431,8 +712,10 @@ int main(void) {
     }
   }
 
+  if (bot_ready) {
+    Bot_Destroy(&bot);
+  }
   Snake_Destroy(&snake);
-  Bot_Shutdown(&bot);
   App_Shutdown(&app);
   return 0;
 }
