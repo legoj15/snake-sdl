@@ -57,11 +57,6 @@ jobs:
           if (!(Test-Path "build\\snakebot.dll")) { throw "Missing build\\snakebot.dll" }
           if (!(Test-Path "build\\game\\snake.exe")) { throw "Missing build\\game\\snake.exe" }
 
-      - name: Rename binaries
-        shell: pwsh
-        run: |
-          Move-Item -Force "build\\game\\snake.exe" "build\\game\\snake-windows.exe"
-
       - name: Package zip
         shell: pwsh
         run: |
@@ -148,12 +143,6 @@ jobs:
           test -f build/launcher
           test -f build/libsnakebot.so
           test -f build/game/snake
-
-      - name: Rename binaries
-        shell: bash
-        run: |
-          set -euo pipefail
-          mv build/game/snake build/game/snake-linux
 
       - name: Package zip
         shell: bash

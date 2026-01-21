@@ -701,26 +701,14 @@ class App(ctk.CTk):
             self.preset_var.set("Custom")
 
     def _find_game_executable(self) -> Path:
-        # Look relative to the launcher so bundled releases work without PATH.
         here = Path(__file__).resolve().parent
         if os.name == "nt":
-            candidates = [
-                here / "snake.exe",
-                here.parent / "snake.exe",
-                here.parent / "build" / "game" / "snake.exe",
-                here.parent.parent / "build" / "snake.exe",
-            ]
+            cand = here / "game" / "snake.exe"
         else:
-            candidates = [
-                here / "snake",
-                here.parent / "snake",
-                here.parent / "build" / "game" / "snake",
-                here.parent.parent / "build" / "snake",
-            ]
-        for cand in candidates:
-            if cand.exists():
-                return cand.resolve()
-        raise FileNotFoundError("Cannot find game executable near build output.")
+            cand = here / "game" / "snake"
+        if cand.exists():
+            return cand.resolve()
+        raise FileNotFoundError(f"Cannot find game executable at: {cand}")
 
     def on_generate(self) -> None:
         try:

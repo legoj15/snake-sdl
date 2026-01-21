@@ -17,6 +17,12 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - 
 
 
+## [2.0.0-hotfix.2] - 2026-01-21
+
+### Fixed
+- Launcher path finding now targets the packaged game layout.
+
+
 ## [2.0.0-hotfix.1] - 2026-01-21
 
 ### Fixed
@@ -54,7 +60,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Apple spawning and body growth.
 - Optional snapped head rendering style.
 
-[Unreleased]: https://github.com/ManifestJW/snake-sdl/compare/v2.0.0-hotfix.1...HEAD
+[Unreleased]: https://github.com/ManifestJW/snake-sdl/compare/v2.0.0-hotfix.2...HEAD
+[2.0.0-hotfix.2]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.0.0-hotfix.2
 [2.0.0-hotfix.1]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.0.0-hotfix.1
 [2.0.0]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.0.0
 [1.0.0]: https://github.com/ManifestJW/snake-sdl/releases/tag/v1.0.0
