@@ -671,7 +671,6 @@ int main(int argc, char **argv) {
   bool game_over = false;
   bool you_win = false;
 
-  bool freeze_interp = true;
   float freeze_alpha = 1.0f;
 
   DeathFx death_fx;
@@ -788,7 +787,6 @@ int main(int argc, char **argv) {
 
             // Freeze pose + mode on win so the final frame stays visually
             // stable.
-            freeze_interp = interp;
             freeze_alpha = 1.0f;
 
             acc = 0;
