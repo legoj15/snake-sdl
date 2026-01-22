@@ -31,10 +31,27 @@ jobs:
               status: "completed",
               per_page: 10
             });
-            const match = runs.data.workflow_runs.find(run => run.conclusion === "success");
+            let match = runs.data.workflow_runs.find(run => run.conclusion === "success");
             if (!match) {
-              core.setFailed(`No successful build.yml run found for sha ${headSha}`);
-              return;
+              const defaultBranch = context.payload.repository?.default_branch || "main";
+              const fallbackRuns = await github.rest.actions.listWorkflowRuns({
+                owner,
+                repo,
+                workflow_id: "build.yml",
+                branch: defaultBranch,
+                status: "completed",
+                per_page: 10
+              });
+              match = fallbackRuns.data.workflow_runs.find(run => run.conclusion === "success");
+              if (!match) {
+                core.setFailed(
+                  `No successful build.yml run found for sha ${headSha} or branch ${defaultBranch}`
+                );
+                return;
+              }
+              core.notice(
+                `No build for sha ${headSha}; using latest successful build on ${defaultBranch}`
+              );
             }
             core.setOutput("run_id", match.id.toString());
 
