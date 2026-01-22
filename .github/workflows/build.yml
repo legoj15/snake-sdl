@@ -78,7 +78,9 @@ jobs:
             "snakebot.dll",
             "readme.txt"
           )
-          Get-ChildItem "build" | Where-Object { $exclude -notcontains $_.Name } |
+          Get-ChildItem "build" | Where-Object {
+            $exclude -notcontains $_.Name -and $_.Extension -ne ".zip" -and $_.Name -notlike "*.build"
+          } |
             ForEach-Object { Copy-Item $_.FullName $pkg -Recurse }
           Copy-Item "build\\game" $pkg -Recurse
           Copy-Item "build\\snakebot.dll" $pkg
@@ -153,7 +155,7 @@ jobs:
           for entry in build/*; do
             name="$(basename "$entry")"
             case "$name" in
-              CMakeFiles|vcpkg_installed|build.ninja|CMakeCache.txt|cmake_install.cmake|compile_commands.json|.ninja_deps|.ninja_log|vcpkg-manifest-install.log|game|libsnakebot.so|readme.txt)
+              CMakeFiles|vcpkg_installed|build.ninja|CMakeCache.txt|cmake_install.cmake|compile_commands.json|.ninja_deps|.ninja_log|vcpkg-manifest-install.log|game|libsnakebot.so|readme.txt|*.zip|*.build)
                 continue
                 ;;
             esac
