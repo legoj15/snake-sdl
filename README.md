@@ -26,6 +26,12 @@ https://github.com/ManifestJW/snake-sdl/releases
 It is recommended to launch the game through the launcher so you can configure
 human mode and bot mode settings. See `launcher/README.md` for details.
 
+### Keybinds
+
+- `G`: toggle grid mode
+- `P`: toggle interpolation
+- `L`: continue after win or game over
+
 ### Linux (x86_64)
 
 1. Download `snake-linux.zip`
