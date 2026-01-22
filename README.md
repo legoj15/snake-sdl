@@ -160,7 +160,7 @@ $env:VCPKG_ROOT = (Get-Location)
 
 #### Build steps
 
-git clone https://github.com/<OWNER>/<REPO>.git
+git clone https://github.com/ManifestJW/snake-sdl.git
 cd snake-sdl
 build-windows.bat release
 
@@ -218,7 +218,7 @@ sudo pacman -S --needed \
 
 #### Build steps
 
-git clone https://github.com/<OWNER>/<REPO>.git
+git clone https://github.com/ManifestJW/snake-sdl.git
 cd snake-sdl
 ./build.sh release
 
