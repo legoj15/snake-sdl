@@ -46,6 +46,17 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 ### Changed
 - Log output now goes to `game/logs/snake.log`.
 
+## [2.1.1-hotfix.1-test.2] - 2026-01-21
+
+### Changed
+- Logging initializes before SDL startup to capture early failures.
+- Linux build script now restores executable bits for `launcher` and `game/snake`.
+- Release job treats `test` tags as pre-releases.
+
+### Fixed
+- Windows build uses `localtime_s` for log timestamps.
+- Audio driver hint now includes PipeWire/PulseAudio/ALSA/Jack/OSS fallback order.
+
 
 ## [2.0.0-hotfix.2] - 2026-01-21
 
@@ -90,7 +101,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Apple spawning and body growth.
 - Optional snapped head rendering style.
 
-[Unreleased]: https://github.com/ManifestJW/snake-sdl/compare/v2.1.1-hotfix.1-test.1...HEAD
+[Unreleased]: https://github.com/ManifestJW/snake-sdl/compare/v2.1.1-hotfix.1-test.2...HEAD
+[2.1.1-hotfix.1-test.2]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.1-hotfix.1-test.2
 [2.1.1-hotfix.1-test.1]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.1-hotfix.1-test.1
 [2.1.1]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.1
 [2.1.0-hotfix.1]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.0-hotfix.1

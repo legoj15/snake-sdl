@@ -5,6 +5,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifdef _WIN32
+#include <direct.h>
+#else
+#include <sys/stat.h>
+#include <sys/types.h>
+#endif
 
 #include "app.h"
 #include "apple.h"
@@ -181,23 +187,30 @@ static void log_to_file(void *userdata, int category, SDL_LogPriority priority,
 
 static FILE *g_log_file = NULL;
 
+static void Log_EnsureDir(const char *path) {
+  if (!path || !*path)
+    return;
+#ifdef _WIN32
+  _mkdir(path);
+#else
+  mkdir(path, 0755);
+#endif
+}
+
 static void Log_OpenFile(void) {
   if (g_log_file)
     return;
   const char *base = SDL_GetBasePath();
   char path[1024];
+  char dir_path[1024];
   if (base) {
-    SDL_snprintf(path, (int)sizeof(path), "%slogs/snake.log", base);
-  } else {
-    SDL_snprintf(path, (int)sizeof(path), "logs/snake.log");
-  }
-  if (base) {
-    char dir_path[1024];
     SDL_snprintf(dir_path, (int)sizeof(dir_path), "%slogs", base);
-    SDL_CreateDirectory(dir_path);
+    SDL_snprintf(path, (int)sizeof(path), "%s/snake.log", dir_path);
   } else {
-    SDL_CreateDirectory("logs");
+    SDL_snprintf(dir_path, (int)sizeof(dir_path), "logs");
+    SDL_snprintf(path, (int)sizeof(path), "%s/snake.log", dir_path);
   }
+  Log_EnsureDir(dir_path);
   g_log_file = fopen(path, "a");
   if (g_log_file) {
     setvbuf(g_log_file, NULL, _IOLBF, 0);
@@ -553,11 +566,12 @@ int main(int argc, char **argv) {
   int init_window_h = 0;
   window_for_grid(init_grid_w, init_grid_h, &init_window_w, &init_window_h);
 
+  Log_OpenFile();
+
   App app = {0};
   if (!App_Init(&app, init_window_w, init_window_h, init_grid_w, init_grid_h)) {
     return 1;
   }
-  Log_OpenFile();
 
   MIX_Mixer *mixer = NULL;
   MIX_Audio *bgm_audio = NULL;
