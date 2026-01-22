@@ -14,6 +14,9 @@ static int clamp_min(int v, int minv) { return (v < minv) ? minv : v; }
 bool App_Init(App* app, int window_w, int window_h, int grid_w, int grid_h) {
     if (!app) return false;
 
+    // Prefer PipeWire/PulseAudio, then fall back to ALSA if needed.
+    SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "pipewire,pulseaudio,alsa,jack,oss");
+
     app->window_w = window_w;
     app->window_h = window_h;
     app->grid_w = clamp_min(grid_w, 1);
@@ -22,7 +25,7 @@ bool App_Init(App* app, int window_w, int window_h, int grid_w, int grid_h) {
     app->cell_w = window_w / app->grid_w;
     app->cell_h = window_h / app->grid_h;
 
-    if (!SDL_Init(SDL_INIT_VIDEO)) {
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return false;
     }

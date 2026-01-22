@@ -167,7 +167,11 @@ static void log_to_file(void *userdata, int category, SDL_LogPriority priority,
     return;
   time_t now = time(NULL);
   struct tm tm_now;
+#ifdef _WIN32
+  localtime_s(&tm_now, &now);
+#else
   localtime_r(&now, &tm_now);
+#endif
   char ts[32];
   strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", &tm_now);
   fprintf(fp, "[%s] [%s] [%d] %s\n", ts, log_priority_name(priority), category,

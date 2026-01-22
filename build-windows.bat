@@ -125,6 +125,8 @@ if exist "%BUILD_DIR%\snake.exe" set "SNAKE_PATH=%BUILD_DIR%\snake.exe"
 if not defined SNAKE_PATH if exist "%BUILD_DIR%\Debug\snake.exe" set "SNAKE_PATH=%BUILD_DIR%\Debug\snake.exe"
 if not defined SNAKE_PATH if exist "%BUILD_DIR%\Release\snake.exe" set "SNAKE_PATH=%BUILD_DIR%\Release\snake.exe"
 if not defined SNAKE_PATH if exist "%BUILD_DIR%\bin\snake.exe" set "SNAKE_PATH=%BUILD_DIR%\bin\snake.exe"
+if not defined SNAKE_PATH if exist "%BUILD_DIR%\Debug\snake\snake.exe" set "SNAKE_PATH=%BUILD_DIR%\Debug\snake\snake.exe"
+if not defined SNAKE_PATH if exist "%BUILD_DIR%\Release\snake\snake.exe" set "SNAKE_PATH=%BUILD_DIR%\Release\snake\snake.exe"
 if not defined SNAKE_PATH (
     for /r "%BUILD_DIR%" %%F in (snake.exe) do (
         if not defined SNAKE_PATH set "SNAKE_PATH=%%F"
