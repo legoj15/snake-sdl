@@ -79,7 +79,7 @@ jobs:
             "readme.txt"
           )
           Get-ChildItem "build" | Where-Object {
-            $exclude -notcontains $_.Name -and $_.Extension -ne ".zip" -and $_.Name -notlike "*.build"
+            $exclude -notcontains $_.Name -and $_.Extension -notin @(".zip", ".lib", ".exp") -and $_.Name -notlike "*.build"
           } |
             ForEach-Object { Copy-Item $_.FullName $pkg -Recurse }
           Copy-Item "build\\game" $pkg -Recurse
