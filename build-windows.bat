@@ -15,17 +15,27 @@ if defined VCPKG_TOOLCHAIN_FILE (
 ) else if defined VCPKG_ROOT (
     set "TOOLCHAIN=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake"
 ) else (
+    REM Try to find vcpkg in PATH if not set explicitly
+    for /f "delims=" %%I in ('where vcpkg 2^>nul') do (
+        set "VCPKG_ROOT=%%~dpI"
+        set "TOOLCHAIN=%%~dpIscripts\buildsystems\vcpkg.cmake"
+        goto :vcpkg_found
+    )
+
     echo ERROR: vcpkg not configured.
     echo.
     echo Set one of:
     echo   VCPKG_ROOT=path\to\vcpkg
     echo   VCPKG_TOOLCHAIN_FILE=path\to\vcpkg\scripts\buildsystems\vcpkg.cmake
     echo.
+    echo Or ensure 'vcpkg' is in your system PATH.
+    echo.
     echo Example:
     echo   set VCPKG_ROOT=C:\vcpkg
     exit /b 1
 )
 
+:vcpkg_found
 if not exist "%TOOLCHAIN%" (
     echo ERROR: vcpkg toolchain file not found:
     echo   %TOOLCHAIN%
@@ -43,7 +53,12 @@ if defined VCPKG_ROOT (
         ) else (
             "%VCPKG_ROOT%\vcpkg.exe" install --x-install-root "%BUILD_DIR%\vcpkg_installed"
         )
-        if errorlevel 1 exit /b 1
+        if errorlevel 1 (
+            echo.
+            echo ERROR: vcpkg installation failed.
+            echo Press any key to continue anyway, or press Ctrl+C to abort...
+            pause
+        )
     ) else (
         echo WARN: vcpkg executable not found at %VCPKG_ROOT%\vcpkg.exe (skipping install)
     )
@@ -108,6 +123,11 @@ if exist "%BUILD_DIR%\snake.exe" (
     echo ERROR: missing %BUILD_DIR%\snake.exe
     exit /b 1
 )
+
+REM This is an absolute bodge and I don't like it.
+echo Copying game assets...
+copy /Y "%BUILD_DIR%\bgm.wav" "%GAME_DIR%\bgm.wav" >nul
+copy /Y "%BUILD_DIR%\*.dll" "%GAME_DIR%\" >nul
 
 echo Built: .\%BUILD_DIR%\launcher.exe
 echo Built: .\%GAME_DIR%\snake.exe

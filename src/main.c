@@ -1,4 +1,5 @@
 #include <SDL3/SDL.h>
+#include <SDL3_mixer/SDL_mixer.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -443,6 +444,51 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  MIX_Mixer *mixer = NULL;
+  MIX_Audio *bgm_audio = NULL;
+  MIX_Track *bgm_track = NULL;
+
+  if (MIX_Init()) {
+      // Create a mixer connected to the default playback device
+      mixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
+      
+      if (mixer) {
+          const char *bgm_files[] = {"bgm.wav", "bgm.opus", "bgm.mp3", "bgm.flac"};
+          int num_files = sizeof(bgm_files) / sizeof(bgm_files[0]);
+
+          for (int i = 0; i < num_files; i++) {
+              // LoadAudio loads the file into RAM (compressed) to be decoded on the fly
+              bgm_audio = MIX_LoadAudio(mixer, bgm_files[i], false);
+              if (bgm_audio) {
+                  SDL_Log("BGM loaded: %s", bgm_files[i]);
+                  break;
+              }
+          }
+
+          if (bgm_audio) {
+              // To play audio, we need a Track
+              bgm_track = MIX_CreateTrack(mixer);
+              if (bgm_track) {
+                  MIX_SetTrackAudio(bgm_track, bgm_audio);
+
+                  // Create properties to tell it to loop infinitely
+                  SDL_PropertiesID props = SDL_CreateProperties();
+                  SDL_SetNumberProperty(props, MIX_PROP_PLAY_LOOPS_NUMBER, -1);
+                  
+                  MIX_PlayTrack(bgm_track, props);
+                  
+                  SDL_DestroyProperties(props);
+              }
+          } else {
+              SDL_Log("No BGM found (checked wav, opus, mp3, flac).");
+          }
+      } else {
+          SDL_Log("MIX_CreateMixerDevice failed: %s", SDL_GetError());
+      }
+  } else {
+      SDL_Log("MIX_Init failed: %s", SDL_GetError());
+  }
+
   if (bot_enabled) {
     SDL_srand((Uint64)meta.seed);
   } else if (cli_seed_set) {
@@ -717,6 +763,18 @@ int main(int argc, char **argv) {
   if (bot_ready) {
     Bot_Destroy(&bot);
   }
+
+  if (bgm_track) {
+      MIX_DestroyTrack(bgm_track);
+  }
+  if (bgm_audio) {
+      MIX_DestroyAudio(bgm_audio);
+  }
+  if (mixer) {
+      MIX_DestroyMixer(mixer);
+  }
+  MIX_Quit();
+
   Snake_Destroy(&snake);
   App_Shutdown(&app);
   return 0;
