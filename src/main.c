@@ -1,14 +1,10 @@
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#endif
-
 #include <SDL3/SDL.h>
 #include <SDL3_mixer/SDL_mixer.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "app.h"
 #include "apple.h"
@@ -80,6 +76,34 @@ static void window_for_grid(int grid_w, int grid_h, int *out_w, int *out_h) {
     *out_h = grid_h * cell;
 }
 
+static MIX_Audio *load_bgm(MIX_Mixer *mixer) {
+  const char *bgm_files[] = {"assets/bgm.wav", "assets/bgm.opus",
+                             "assets/bgm.mp3"};
+  const int num_files = (int)(sizeof(bgm_files) / sizeof(bgm_files[0]));
+  const char *base = SDL_GetBasePath();
+  MIX_Audio *audio = NULL;
+
+  for (int i = 0; i < num_files; i++) {
+    char path[1024];
+    if (base) {
+      SDL_snprintf(path, (int)sizeof(path), "%s%s", base, bgm_files[i]);
+      audio = MIX_LoadAudio(mixer, path, false);
+      if (audio) {
+        SDL_Log("BGM loaded: %s", path);
+        break;
+      }
+    }
+    SDL_snprintf(path, (int)sizeof(path), "%s", bgm_files[i]);
+    audio = MIX_LoadAudio(mixer, path, false);
+    if (audio) {
+      SDL_Log("BGM loaded: %s", path);
+      break;
+    }
+  }
+
+  return audio;
+}
+
 static int tick_hz_for_score(int score) {
   int hz = BASE_TICK_HZ + (score / RAMP_EVERY);
   return clampi(hz, 1, MAX_TICK_HZ);
@@ -107,6 +131,83 @@ static void Snake_ForceWinFill(Snake *s) {
     s->len += 1;
     s->grow -= 1;
   }
+}
+
+static void Snake_SyncPrevToSeg(Snake *s) {
+  if (!s || !s->prev || !s->seg)
+    return;
+  for (int i = 0; i < s->len; i++) {
+    s->prev[i] = s->seg[i];
+  }
+}
+
+static const char *log_priority_name(SDL_LogPriority priority) {
+  switch (priority) {
+    case SDL_LOG_PRIORITY_VERBOSE:
+      return "VERBOSE";
+    case SDL_LOG_PRIORITY_DEBUG:
+      return "DEBUG";
+    case SDL_LOG_PRIORITY_INFO:
+      return "INFO";
+    case SDL_LOG_PRIORITY_WARN:
+      return "WARN";
+    case SDL_LOG_PRIORITY_ERROR:
+      return "ERROR";
+    case SDL_LOG_PRIORITY_CRITICAL:
+      return "CRITICAL";
+    default:
+      return "LOG";
+  }
+}
+
+static void log_to_file(void *userdata, int category, SDL_LogPriority priority,
+                        const char *message) {
+  FILE *fp = (FILE *)userdata;
+  if (!fp)
+    return;
+  time_t now = time(NULL);
+  struct tm tm_now;
+  localtime_r(&now, &tm_now);
+  char ts[32];
+  strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", &tm_now);
+  fprintf(fp, "[%s] [%s] [%d] %s\n", ts, log_priority_name(priority), category,
+          message);
+  fflush(fp);
+}
+
+static FILE *g_log_file = NULL;
+
+static void Log_OpenFile(void) {
+  if (g_log_file)
+    return;
+  const char *base = SDL_GetBasePath();
+  char path[1024];
+  if (base) {
+    SDL_snprintf(path, (int)sizeof(path), "%slogs/snake.log", base);
+  } else {
+    SDL_snprintf(path, (int)sizeof(path), "logs/snake.log");
+  }
+  if (base) {
+    char dir_path[1024];
+    SDL_snprintf(dir_path, (int)sizeof(dir_path), "%slogs", base);
+    SDL_CreateDirectory(dir_path);
+  } else {
+    SDL_CreateDirectory("logs");
+  }
+  g_log_file = fopen(path, "a");
+  if (g_log_file) {
+    setvbuf(g_log_file, NULL, _IOLBF, 0);
+    SDL_SetLogOutputFunction(log_to_file, g_log_file);
+    SDL_Log("Logging to: %s", path);
+  }
+}
+
+static void Log_CloseFile(void) {
+  if (!g_log_file)
+    return;
+  SDL_SetLogOutputFunction(NULL, NULL);
+  fclose(g_log_file);
+  g_log_file = NULL;
 }
 
 static void Game_Reset(Snake *snake, Apple *apple, int *score, int *tick_hz,
@@ -336,11 +437,13 @@ int main(int argc, char **argv) {
   int cli_grid_h = GRID_H;
   unsigned int cli_seed = 0;
   bool cli_seed_set = false;
+  bool bgm_enabled = true;
 
   // CLI:
   //   --bot                 enable bot mode
   //   --bot-cycle <file>    optional .cycle container file (refused if not
   //   .cycle)
+  //   --no-bgm              disable background music
   for (int i = 1; i < argc; i++) {
     if (arg_eq(argv[i], "--bot")) {
       bot_enabled = true;
@@ -402,6 +505,8 @@ int main(int argc, char **argv) {
       cli_seed = (unsigned int)atoi(argv[i + 1]);
       cli_seed_set = true;
       i++;
+    } else if (arg_eq(argv[i], "--no-bgm")) {
+      bgm_enabled = false;
     }
   }
 
@@ -448,59 +553,20 @@ int main(int argc, char **argv) {
   if (!App_Init(&app, init_window_w, init_window_h, init_grid_w, init_grid_h)) {
     return 1;
   }
+  Log_OpenFile();
 
   MIX_Mixer *mixer = NULL;
   MIX_Audio *bgm_audio = NULL;
   MIX_Track *bgm_track = NULL;
+  bool mix_inited = false;
 
-  if (MIX_Init()) {
+  if (bgm_enabled && MIX_Init()) {
+      mix_inited = true;
       // Create a mixer connected to the default playback device
       mixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
-
+      
       if (mixer) {
-          char base_path[1024] = {0};
-          bool path_found = false;
-
-#ifdef _WIN32
-          // WINDOWS: Use native API to avoid CRT malloc/free mismatch crashes
-          if (GetModuleFileNameA(NULL, base_path, sizeof(base_path))) {
-              // GetModuleFileName returns "C:\Path\To\snake.exe"
-              // We need to strip the executable name to get the folder.
-              char *last_slash = strrchr(base_path, '\\');
-              if (last_slash) {
-                  *(last_slash + 1) = '\0'; // Keep the trailing slash
-              }
-              path_found = true;
-          }
-#else
-          // LINUX/MAC: Use SDL (memory safety is usually easier on *nix dynamic linking)
-          char *sdl_path = SDL_GetBasePath();
-          if (sdl_path) {
-              snprintf(base_path, sizeof(base_path), "%s", sdl_path);
-              SDL_free(sdl_path); // Free it immediately after copying
-              path_found = true;
-          }
-#endif
-
-          if (path_found) {
-              const char *bgm_files[] = {"bgm.wav", "bgm.opus", "bgm.mp3", "bgm.flac"};
-              int num_files = sizeof(bgm_files) / sizeof(bgm_files[0]);
-              char full_path[1024];
-
-              for (int i = 0; i < num_files; i++) {
-                  // Construct absolute path: base_path includes the trailing slash
-                  snprintf(full_path, sizeof(full_path), "%s%s", base_path, bgm_files[i]);
-                  
-                  bgm_audio = MIX_LoadAudio(mixer, full_path, false);
-                  if (bgm_audio) {
-                      SDL_Log("BGM loaded: %s", full_path);
-                      break;
-                  }
-              }
-          } else {
-              SDL_Log("Could not determine executable path.");
-          }
-
+          bgm_audio = load_bgm(mixer);
           if (bgm_audio) {
               // To play audio, we need a Track
               bgm_track = MIX_CreateTrack(mixer);
@@ -516,12 +582,12 @@ int main(int argc, char **argv) {
                   SDL_DestroyProperties(props);
               }
           } else {
-              SDL_Log("No BGM found (checked wav, opus, mp3, flac).");
+              SDL_Log("No BGM found (checked assets/bgm.{wav,opus,mp3}).");
           }
       } else {
           SDL_Log("MIX_CreateMixerDevice failed: %s", SDL_GetError());
       }
-  } else {
+  } else if (bgm_enabled) {
       SDL_Log("MIX_Init failed: %s", SDL_GetError());
   }
 
@@ -605,7 +671,6 @@ int main(int argc, char **argv) {
   bool game_over = false;
   bool you_win = false;
 
-  bool freeze_interp = true;
   float freeze_alpha = 1.0f;
 
   DeathFx death_fx;
@@ -717,14 +782,12 @@ int main(int argc, char **argv) {
 
           if (score >= max_score) {
             Snake_ForceWinFill(&snake);
+            Snake_SyncPrevToSeg(&snake);
             you_win = true;
 
             // Freeze pose + mode on win so the final frame stays visually
             // stable.
-            freeze_interp = interp;
-            freeze_alpha = freeze_interp
-                               ? (float)clamp01((double)acc / (double)tick_ns)
-                               : 1.0f;
+            freeze_alpha = 1.0f;
 
             acc = 0;
             break;
@@ -800,18 +863,21 @@ int main(int argc, char **argv) {
     Bot_Destroy(&bot);
   }
 
-// --- BGM: Cleanup (SDL3_mixer API) ---
-
-  // This automatically destroys 'bgm_track' and releases the reference to 'bgm_audio'.
-if (mixer) {
-      // Destroying the mixer automatically destroys all Tracks associated with it.
-      // The Tracks will release their hold on the Audio.
+  if (bgm_track) {
+      MIX_DestroyTrack(bgm_track);
+  }
+  if (bgm_audio) {
+      MIX_DestroyAudio(bgm_audio);
+  }
+  if (mixer) {
       MIX_DestroyMixer(mixer);
   }
-
-  MIX_Quit();
+  if (mix_inited) {
+      MIX_Quit();
+  }
 
   Snake_Destroy(&snake);
   App_Shutdown(&app);
+  Log_CloseFile();
   return 0;
 }

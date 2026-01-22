@@ -26,6 +26,14 @@ https://github.com/ManifestJW/snake-sdl/releases
 It is recommended to launch the game through the launcher so you can configure
 human mode and bot mode settings. See `launcher/README.md` for details.
 
+Logs are written to `game/logs/snake.log` in the packaged folder.
+
+### Keybinds
+
+- `G`: toggle grid mode
+- `P`: toggle interpolation
+- `L`: continue after win or game over
+
 ### Linux (x86_64)
 
 1. Download `snake-linux.zip`
@@ -44,6 +52,7 @@ The Linux binary is dynamically linked and depends on common system libraries
 
 On a Ubuntu / Pop!_OS system, install:
 
+```bash
 sudo apt-get update
 sudo apt-get install -y \
   libx11-6 libxext6 libxrandr2 libxrender1 libxss1 \
@@ -51,27 +60,35 @@ sudo apt-get install -y \
   libsm6 libice6 \
   libwayland-client0 libwayland-cursor0 libwayland-egl1 \
   libegl1 libgl1 \
-  libasound2
+  libasound2 \
+  libogg0 libvorbis0a libvorbisfile3 libopusfile0
+```
 
 On Fedora/RHEL:
 
+```bash
 sudo dnf install -y \
   libX11 libXext libXrandr libXrender libXScrnSaver \
   libXcursor libXi libXinerama libxkbcommon \
   libSM libICE \
   wayland wayland-client wayland-cursor \
   mesa-libEGL mesa-libGL \
-  alsa-lib
+  alsa-lib \
+  libogg libvorbis libvorbisfile opusfile
+```
 
 On Arch:
 
+```bash
 sudo pacman -S --needed \
   libx11 libxext libxrandr libxrender libxscrnsaver \
   libxcursor libxi libxinerama libxkbcommon \
   libsm libice \
   wayland \
   mesa \
-  alsa-lib
+  alsa-lib \
+  libogg libvorbis opusfile
+```
 
 You must run the game from a graphical session (Wayland or X11).
 Running from a TTY or over SSH without display forwarding will fail.
@@ -107,6 +124,30 @@ Windows installation without additional DLLs.
 - vcpkg (manifest mode)
 - Python 3.13+ (for building the launcher)
 
+### vcpkg setup (all platforms)
+
+Clone vcpkg and set `VCPKG_ROOT` in your shell before building.
+This repo pins the vcpkg baseline to commit `01e159b519b7e791cc5bb3548663a26d9c0922a3`,
+so make sure your vcpkg checkout includes that commit.
+
+Linux/macOS (bash/zsh):
+
+git clone https://github.com/microsoft/vcpkg.git
+cd vcpkg
+git fetch --tags
+git checkout 01e159b519b7e791cc5bb3548663a26d9c0922a3
+./bootstrap-vcpkg.sh
+export VCPKG_ROOT="$PWD"
+
+Windows (PowerShell):
+
+git clone https://github.com/microsoft/vcpkg.git
+cd vcpkg
+git fetch --tags
+git checkout 01e159b519b7e791cc5bb3548663a26d9c0922a3
+.\bootstrap-vcpkg.bat
+$env:VCPKG_ROOT = (Get-Location)
+
 ---
 
 ### Windows build (MSVC)
@@ -129,42 +170,51 @@ build-windows.bat release
 
 #### Build dependencies
 
+```bash
 sudo apt-get update
 sudo apt-get install -y \
   autoconf autoconf-archive automake libtool \
-  pkg-config zip \
+  pkg-config \
   python3-venv python3-dev python3-tk patchelf libltdl-dev \
   libx11-dev libxext-dev libxrandr-dev libxrender-dev libxss-dev \
   libxcursor-dev libxi-dev libxinerama-dev libxkbcommon-dev \
   libsm-dev libice-dev libxtst-dev \
   libwayland-dev wayland-protocols libdecor-0-dev \
   libegl1-mesa-dev libgl1-mesa-dev \
-  libasound2-dev
+  libasound2-dev \
+  libogg-dev libvorbis-dev libopusfile-dev
+```
 
 On Fedora/RHEL:
 
+```bash
 sudo dnf install -y \
   autoconf autoconf-archive automake libtool \
-  pkgconf zip \
+  pkgconf \
   python3-virtualenv python3-devel python3-tkinter patchelf libtool-ltdl-devel \
   libX11-devel libXext-devel libXrandr-devel libXrender-devel libXScrnSaver-devel \
   libXcursor-devel libXi-devel libXinerama-devel libxkbcommon-devel \
   libSM-devel libICE-devel libXtst-devel \
   wayland-devel wayland-protocols-devel libdecor-devel \
   mesa-libEGL-devel mesa-libGL-devel \
-  alsa-lib-devel
+  alsa-lib-devel \
+  libogg-devel libvorbis-devel opusfile-devel
+```
 
 On Arch:
 
+```bash
 sudo pacman -S --needed \
   autoconf autoconf-archive automake libtool \
-  pkgconf zip python python-virtualenv tk patchelf libltdl \
+  pkgconf python python-virtualenv tk patchelf libltdl \
   libx11 libxext libxrandr libxrender libxscrnsaver \
   libxcursor libxi libxinerama libxkbcommon \
   libsm libice libxtst \
   wayland wayland-protocols libdecor \
   mesa \
-  alsa-lib
+  alsa-lib \
+  libogg libvorbis opusfile
+```
 
 #### Build steps
 

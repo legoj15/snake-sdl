@@ -56,13 +56,9 @@ jobs:
           if (!(Test-Path "build\\launcher.exe")) { throw "Missing build\\launcher.exe" }
           if (!(Test-Path "build\\snakebot.dll")) { throw "Missing build\\snakebot.dll" }
           if (!(Test-Path "build\\game\\snake.exe")) { throw "Missing build\\game\\snake.exe" }
+          if (!(Test-Path "build\\game\\assets\\bgm.wav")) { throw "Missing build\\game\\assets\\bgm.wav" }
 
-      - name: Rename binaries
-        shell: pwsh
-        run: |
-          Move-Item -Force "build\\game\\snake.exe" "build\\game\\snake-windows.exe"
-
-      - name: Package zip
+      - name: Stage package (Windows)
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
@@ -83,20 +79,19 @@ jobs:
             "snakebot.dll",
             "readme.txt"
           )
-          Get-ChildItem "build" | Where-Object { $exclude -notcontains $_.Name } |
+          Get-ChildItem "build" | Where-Object {
+            $exclude -notcontains $_.Name -and $_.Extension -notin @(".zip", ".lib", ".exp") -and $_.Name -notlike "*.build"
+          } |
             ForEach-Object { Copy-Item $_.FullName $pkg -Recurse }
           Copy-Item "build\\game" $pkg -Recurse
           Copy-Item "build\\snakebot.dll" $pkg
           if (Test-Path "build\\readme.txt") { Copy-Item "build\\readme.txt" $pkg }
-          $zip = "dist\\snake-windows.zip"
-          if (Test-Path $zip) { Remove-Item $zip }
-          Compress-Archive -Path "$pkg\\*" -DestinationPath $zip
 
       - name: Upload artifact (Windows)
         uses: actions/upload-artifact@v4
         with:
-          name: snake-windows-zip
-          path: dist/snake-windows.zip
+          name: snake-windows
+          path: dist/package-windows
 
   build-linux:
     name: Linux (Release)
@@ -115,7 +110,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             autoconf autoconf-archive automake libtool \
-            pkg-config zip \
+            pkg-config \
             python3-venv python3-dev python3-tk patchelf libltdl-dev \
             libx11-dev libxext-dev libxrandr-dev libxrender-dev libxss-dev \
             libxcursor-dev libxi-dev libxinerama-dev libxkbcommon-dev \
@@ -123,7 +118,8 @@ jobs:
             libxtst-dev \
             libwayland-dev wayland-protocols libdecor-0-dev \
             libegl1-mesa-dev libgl1-mesa-dev \
-            libasound2-dev
+            libasound2-dev \
+            libogg-dev libvorbis-dev libopusfile-dev
 
       - name: Setup CMake + Ninja
         uses: lukka/get-cmake@latest
@@ -148,14 +144,9 @@ jobs:
           test -f build/launcher
           test -f build/libsnakebot.so
           test -f build/game/snake
+          test -f build/game/assets/bgm.wav
 
-      - name: Rename binaries
-        shell: bash
-        run: |
-          set -euo pipefail
-          mv build/game/snake build/game/snake-linux
-
-      - name: Package zip
+      - name: Stage package (Linux)
         shell: bash
         run: |
           set -euo pipefail
@@ -164,7 +155,7 @@ jobs:
           for entry in build/*; do
             name="$(basename "$entry")"
             case "$name" in
-              CMakeFiles|vcpkg_installed|build.ninja|CMakeCache.txt|cmake_install.cmake|compile_commands.json|.ninja_deps|.ninja_log|vcpkg-manifest-install.log|game|libsnakebot.so|readme.txt)
+              CMakeFiles|vcpkg_installed|build.ninja|CMakeCache.txt|cmake_install.cmake|compile_commands.json|.ninja_deps|.ninja_log|vcpkg-manifest-install.log|game|libsnakebot.so|readme.txt|*.zip|*.build)
                 continue
                 ;;
             esac
@@ -173,13 +164,12 @@ jobs:
           cp -a build/game dist/package-linux/
           cp -a build/libsnakebot.so dist/package-linux/
           if [ -f build/readme.txt ]; then cp -a build/readme.txt dist/package-linux/; fi
-          (cd dist/package-linux && zip -r ../snake-linux.zip .)
 
       - name: Upload artifact (Linux)
         uses: actions/upload-artifact@v4
         with:
-          name: snake-linux-zip
-          path: dist/snake-linux.zip
+          name: snake-linux
+          path: dist/package-linux
 
   release:
     name: Release
@@ -194,7 +184,25 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: dist
-          merge-multiple: true
+
+      - name: Install zip (Release)
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y zip
+
+      - name: Package zips (Release)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          if [ -d snake-windows ]; then
+            (cd snake-windows && zip -r ../snake-windows.zip .)
+          fi
+          if [ -d snake-linux ]; then
+            (cd snake-linux && zip -r ../snake-linux.zip .)
+          fi
 
       - name: Extract changelog for release
         shell: bash

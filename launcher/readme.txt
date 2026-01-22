@@ -34,6 +34,11 @@ Bot mode
 - Adjust Bot speed (TPS) and any tuning values.
 - Click Launch game (bot).
 
+Keybinds
+- G: toggle grid mode
+- P: toggle interpolation
+- L: continue after win or game over
+
 Bot tuning constants (detailed)
 
 These values change the scoring weights used by the bot when deciding whether

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(snake LANGUAGES C)
+project(snake LANGUAGES C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -11,24 +11,28 @@ set(ROOT "${CMAKE_CURRENT_LIST_DIR}")
 # Dependencies
 # ------------------------------------------------------------
 find_package(SDL3 CONFIG REQUIRED)
-
-# --- PLAN B: Fetch SDL3_mixer manually ---
 include(FetchContent)
 
-# Prevent SDL_mixer from building its own shared library (we just want to link it statically if possible)
-# or just let it build defaults. We set shared to OFF to simplify DLL management usually, 
-# but for simplicity let's rely on its defaults or force it to static to avoid copying another DLL.
-option(SDL3MIXER_BUILD_EXAMPLES "Build examples" OFF)
-option(SDL3MIXER_BUILD_TESTS "Build tests" OFF)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libs for vendored deps" FORCE)
+set(SDL3MIXER_VENDORED OFF CACHE BOOL "Use system SDL3" FORCE)
+set(SDL3MIXER_SAMPLES OFF CACHE BOOL "Skip SDL3_mixer sample programs" FORCE)
+set(SDLMIXER_DEPS_SHARED OFF CACHE BOOL "Disable dynamic dependency loading" FORCE)
+set(SDLMIXER_OPUS_SHARED OFF CACHE BOOL "Link libopus/opusfile statically" FORCE)
+set(SDLMIXER_OPUSFILE_SHARED OFF CACHE BOOL "Link opusfile statically" FORCE)
+set(SDLMIXER_VORBIS_VORBISFILE_SHARED OFF CACHE BOOL "Link vorbisfile statically" FORCE)
+set(SDLMIXER_MP3_MPG123 OFF CACHE BOOL "Disable mpg123 MP3 backend" FORCE)
+set(SDLMIXER_MIDI_FLUIDSYNTH OFF CACHE BOOL "Disable FluidSynth backend" FORCE)
+set(SDLMIXER_MOD_XMP OFF CACHE BOOL "Disable libxmp MOD backend" FORCE)
+set(SDLMIXER_FLAC OFF CACHE BOOL "Disable FLAC backends" FORCE)
+set(SDLMIXER_GME OFF CACHE BOOL "Disable GME backends" FORCE)
+set(SDLMIXER_WAVPACK OFF CACHE BOOL "Disable WavPack backend" FORCE)
 
-message(STATUS "Fetching SDL3_mixer from GitHub...")
 FetchContent_Declare(
   SDL3_mixer
   GIT_REPOSITORY https://github.com/libsdl-org/SDL_mixer.git
-  GIT_TAG main  # Pulling from main branch since SDL3 is bleeding edge
+  GIT_TAG main
 )
 FetchContent_MakeAvailable(SDL3_mixer)
-# ------------------------------------------------------------
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
@@ -65,6 +69,10 @@ else()
   target_link_libraries(snake PRIVATE SDL3::SDL3 SDL3_mixer::SDL3_mixer)
 endif()
 
+if (NOT WIN32)
+  set_property(TARGET snake PROPERTY LINKER_LANGUAGE CXX)
+endif()
+
 target_compile_options(snake PRIVATE
   $<$<C_COMPILER_ID:MSVC>:/W4>
   $<$<NOT:$<C_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic>
@@ -72,23 +80,11 @@ target_compile_options(snake PRIVATE
 
 set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
 
-# This is like uber temporary for the love of god replace this immediately
-set(BGM_PATH "${CMAKE_BINARY_DIR}/bgm.wav")
-if (NOT EXISTS "${BGM_PATH}")
-  message(STATUS "Downloading BGM from legoj15.net...")
-  file(DOWNLOAD 
-    "https://legoj15.net/cdn/bgm.wav" 
-    "${BGM_PATH}" 
-    SHOW_PROGRESS
-    tls_verify ON
-  )
-endif()
-
-#This is also a hack
-if (WIN32)
+# This is also a hack
+if (WIN32 AND TARGET SDL3_mixer::SDL3_mixer)
   add_custom_command(TARGET snake POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    $<TARGET_FILE:SDL3_mixer-shared>
+    $<TARGET_FILE:SDL3_mixer::SDL3_mixer>
     $<TARGET_FILE_DIR:snake>
     COMMENT "Copying SDL3_mixer.dll to executable directory"
   )
