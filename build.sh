@@ -7,6 +7,8 @@ set -euo pipefail
 #   PRESET=debug ./build.sh
 #   VCPKG_ROOT=... ./build.sh debug
 
+rm -rf build
+
 PRESET="${1:-${PRESET:-debug}}"
 BUILD_DIR="build"
 GAME_DIR="${BUILD_DIR}/game"
@@ -25,6 +27,11 @@ if [[ -n "${VCPKG_TOOLCHAIN_FILE:-}" ]]; then
 elif [[ -n "${VCPKG_ROOT:-}" ]]; then
   TOOLCHAIN="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
 else
+  if command -v vcpkg >/dev/null 2>&1; then
+    VCPKG_EXE="$(command -v vcpkg)"
+    VCPKG_ROOT="$(dirname "$VCPKG_EXE")"
+    TOOLCHAIN="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+  else
   cat >&2 <<'EOF'
 ERROR: vcpkg not configured.
 
@@ -33,6 +40,7 @@ Set one of:
   - VCPKG_TOOLCHAIN_FILE=/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake
 EOF
   exit 1
+  fi
 fi
 
 if [[ ! -f "$TOOLCHAIN" ]]; then
@@ -79,23 +87,59 @@ python -m pip install --upgrade pip >/dev/null
 python -m pip install -r launcher/requirements.txt >/dev/null
 
 echo "Building launcher..."
-python -m nuitka --standalone --assume-yes-for-downloads --lto=no --enable-plugin=tk-inter --include-package=customtkinter --output-dir="$BUILD_DIR" --output-filename=launcher launcher/main.py
+LAUNCHER_OUT_DIR="${BUILD_DIR}/launcher_build"
+python -m nuitka --standalone --assume-yes-for-downloads --lto=no --enable-plugin=tk-inter --include-package=customtkinter --output-dir="$LAUNCHER_OUT_DIR" --output-filename=launcher launcher/main.py
 
-DIST_DIR="${BUILD_DIR}/main.dist"
+DIST_DIR="${LAUNCHER_OUT_DIR}/main.dist"
 if [[ -d "$DIST_DIR" ]]; then
   cp -a "$DIST_DIR"/. "$BUILD_DIR"/
-  rm -rf "$DIST_DIR"
+  rm -rf "$LAUNCHER_OUT_DIR"
 fi
 
 if [[ -f "launcher/readme.txt" ]]; then
   cp -a "launcher/readme.txt" "${BUILD_DIR}/readme.txt"
 fi
 
-if [[ -f "${BUILD_DIR}/snake" ]]; then
-  mv "${BUILD_DIR}/snake" "${GAME_DIR}/snake"
+find_snake() {
+  local candidate
+  for candidate in \
+    "${BUILD_DIR}/snake" \
+    "${BUILD_DIR}/Debug/snake" \
+    "${BUILD_DIR}/Release/snake" \
+    "${BUILD_DIR}/bin/snake"; do
+    if [[ -f "$candidate" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  candidate="$(find "${BUILD_DIR}" -maxdepth 3 -type f -name snake -perm -u+x 2>/dev/null | head -n 1)"
+  if [[ -n "$candidate" ]]; then
+    echo "$candidate"
+    return 0
+  fi
+  return 1
+}
+
+SNAKE_PATH="$(find_snake || true)"
+if [[ -z "$SNAKE_PATH" ]]; then
+  echo "Snake binary missing; retrying explicit build target..." >&2
+  cmake --build --preset "$PRESET" --parallel --target snake
+  SNAKE_PATH="$(find_snake || true)"
+fi
+
+if [[ -n "$SNAKE_PATH" ]]; then
+  mv "$SNAKE_PATH" "${GAME_DIR}/snake"
 else
-  echo "ERROR: missing ${BUILD_DIR}/snake" >&2
+  echo "ERROR: missing snake binary after build." >&2
   exit 1
+fi
+
+if [[ -d "assets" ]]; then
+  echo "Copying game assets..."
+  mkdir -p "${GAME_DIR}/assets"
+  cp -a "assets/." "${GAME_DIR}/assets/"
+else
+  echo "WARN: assets/ not found; skipping asset copy."
 fi
 
 echo "Built: ./${BUILD_DIR}/launcher"

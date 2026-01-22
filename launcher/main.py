@@ -178,6 +178,8 @@ class App(ctk.CTk):
         self.human_w_var = ctk.StringVar(value="40")
         self.human_h_var = ctk.StringVar(value="30")
         self.human_seed_var = ctk.StringVar(value="")
+        self.bot_bgm_var = ctk.BooleanVar(value=True)
+        self.human_bgm_var = ctk.BooleanVar(value=True)
 
         self.tuning_presets = {
             "Safe": {
@@ -321,6 +323,12 @@ class App(ctk.CTk):
             number_of_steps=len(self.bot_tps_steps) - 1,
             command=self._on_bot_tps_change,
         ).grid(row=2, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 10))
+
+        ctk.CTkCheckBox(
+            bot_cfg,
+            text="Enable background music",
+            variable=self.bot_bgm_var,
+        ).grid(row=3, column=0, columnspan=2, sticky="w", padx=10, pady=(0, 10))
 
         bot_cfg.grid_columnconfigure(0, weight=1)
         bot_cfg.grid_columnconfigure(1, weight=0, minsize=60)
@@ -482,11 +490,17 @@ class App(ctk.CTk):
             row=2, column=2, sticky="w", padx=10, pady=(0, 10)
         )
 
+        ctk.CTkCheckBox(
+            human,
+            text="Enable background music",
+            variable=self.human_bgm_var,
+        ).grid(row=3, column=0, columnspan=2, sticky="w", padx=10, pady=(0, 10))
+
         self.launch_human_btn = ctk.CTkButton(
             human, text="Launch game (human)", command=self.on_launch_human
         )
         self.launch_human_btn.grid(
-            row=3, column=0, columnspan=2, sticky="w", padx=10, pady=(0, 10)
+            row=4, column=0, columnspan=2, sticky="w", padx=10, pady=(0, 10)
         )
 
         human.grid_columnconfigure(3, weight=1)
@@ -792,6 +806,8 @@ class App(ctk.CTk):
                 "--bot-tps",
                 str(tps),
             ]
+            if not self.bot_bgm_var.get():
+                cmd.append("--no-bgm")
             tuning = self._current_tuning()
             cmd += [
                 "--bot-k-progress",
@@ -833,6 +849,8 @@ class App(ctk.CTk):
             cmd = [str(game), "--grid-w", str(w), "--grid-h", str(h)]
             if seed_set:
                 cmd += ["--seed", str(seed)]
+            if not self.human_bgm_var.get():
+                cmd.append("--no-bgm")
 
             self.log("Launching: " + " ".join(cmd))
             subprocess.Popen(cmd, cwd=str(game.parent))

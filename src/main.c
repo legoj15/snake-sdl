@@ -75,6 +75,34 @@ static void window_for_grid(int grid_w, int grid_h, int *out_w, int *out_h) {
     *out_h = grid_h * cell;
 }
 
+static MIX_Audio *load_bgm(MIX_Mixer *mixer) {
+  const char *bgm_files[] = {"assets/bgm.wav", "assets/bgm.opus",
+                             "assets/bgm.mp3"};
+  const int num_files = (int)(sizeof(bgm_files) / sizeof(bgm_files[0]));
+  const char *base = SDL_GetBasePath();
+  MIX_Audio *audio = NULL;
+
+  for (int i = 0; i < num_files; i++) {
+    char path[1024];
+    if (base) {
+      SDL_snprintf(path, (int)sizeof(path), "%s%s", base, bgm_files[i]);
+    } else {
+      SDL_snprintf(path, (int)sizeof(path), "%s", bgm_files[i]);
+    }
+    audio = MIX_LoadAudio(mixer, path, false);
+    if (audio) {
+      SDL_Log("BGM loaded: %s", path);
+      break;
+    }
+  }
+
+  if (base) {
+    SDL_free((void *)base);
+  }
+
+  return audio;
+}
+
 static int tick_hz_for_score(int score) {
   int hz = BASE_TICK_HZ + (score / RAMP_EVERY);
   return clampi(hz, 1, MAX_TICK_HZ);
@@ -331,11 +359,13 @@ int main(int argc, char **argv) {
   int cli_grid_h = GRID_H;
   unsigned int cli_seed = 0;
   bool cli_seed_set = false;
+  bool bgm_enabled = true;
 
   // CLI:
   //   --bot                 enable bot mode
   //   --bot-cycle <file>    optional .cycle container file (refused if not
   //   .cycle)
+  //   --no-bgm              disable background music
   for (int i = 1; i < argc; i++) {
     if (arg_eq(argv[i], "--bot")) {
       bot_enabled = true;
@@ -397,6 +427,8 @@ int main(int argc, char **argv) {
       cli_seed = (unsigned int)atoi(argv[i + 1]);
       cli_seed_set = true;
       i++;
+    } else if (arg_eq(argv[i], "--no-bgm")) {
+      bgm_enabled = false;
     }
   }
 
@@ -448,23 +480,12 @@ int main(int argc, char **argv) {
   MIX_Audio *bgm_audio = NULL;
   MIX_Track *bgm_track = NULL;
 
-  if (MIX_Init()) {
+  if (bgm_enabled && MIX_Init()) {
       // Create a mixer connected to the default playback device
       mixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
       
       if (mixer) {
-          const char *bgm_files[] = {"bgm.wav", "bgm.opus", "bgm.mp3", "bgm.flac"};
-          int num_files = sizeof(bgm_files) / sizeof(bgm_files[0]);
-
-          for (int i = 0; i < num_files; i++) {
-              // LoadAudio loads the file into RAM (compressed) to be decoded on the fly
-              bgm_audio = MIX_LoadAudio(mixer, bgm_files[i], false);
-              if (bgm_audio) {
-                  SDL_Log("BGM loaded: %s", bgm_files[i]);
-                  break;
-              }
-          }
-
+          bgm_audio = load_bgm(mixer);
           if (bgm_audio) {
               // To play audio, we need a Track
               bgm_track = MIX_CreateTrack(mixer);
@@ -480,12 +501,12 @@ int main(int argc, char **argv) {
                   SDL_DestroyProperties(props);
               }
           } else {
-              SDL_Log("No BGM found (checked wav, opus, mp3, flac).");
+              SDL_Log("No BGM found (checked assets/bgm.{wav,opus,mp3}).");
           }
       } else {
           SDL_Log("MIX_CreateMixerDevice failed: %s", SDL_GetError());
       }
-  } else {
+  } else if (bgm_enabled) {
       SDL_Log("MIX_Init failed: %s", SDL_GetError());
   }
 

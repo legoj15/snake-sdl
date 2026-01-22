@@ -56,6 +56,7 @@ jobs:
           if (!(Test-Path "build\\launcher.exe")) { throw "Missing build\\launcher.exe" }
           if (!(Test-Path "build\\snakebot.dll")) { throw "Missing build\\snakebot.dll" }
           if (!(Test-Path "build\\game\\snake.exe")) { throw "Missing build\\game\\snake.exe" }
+          if (!(Test-Path "build\\game\\assets\\bgm.wav")) { throw "Missing build\\game\\assets\\bgm.wav" }
 
       - name: Package zip
         shell: pwsh
@@ -120,7 +121,10 @@ jobs:
             libxtst-dev \
             libwayland-dev wayland-protocols libdecor-0-dev \
             libegl1-mesa-dev libgl1-mesa-dev \
-            libasound2-dev
+            libasound2-dev \
+            libogg-dev libvorbis-dev libopusfile-dev \
+            libxmp-dev libmpg123-dev \
+            libfluidsynth-dev
 
       - name: Setup CMake + Ninja
         uses: lukka/get-cmake@latest
@@ -145,6 +149,7 @@ jobs:
           test -f build/launcher
           test -f build/libsnakebot.so
           test -f build/game/snake
+          test -f build/game/assets/bgm.wav
 
       - name: Package zip
         shell: bash

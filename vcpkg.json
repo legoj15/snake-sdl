@@ -2,6 +2,12 @@
   "name": "snake-sdl",
   "version-string": "2.1.0",
   "dependencies": [
-    "sdl3"
+    "sdl3",
+    "fluidsynth",
+    "libogg",
+    "libvorbis",
+    "libxmp",
+    "mpg123",
+    "opusfile"
   ]
 }

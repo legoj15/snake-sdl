@@ -57,7 +57,10 @@ sudo apt-get install -y \
   libsm6 libice6 \
   libwayland-client0 libwayland-cursor0 libwayland-egl1 \
   libegl1 libgl1 \
-  libasound2
+  libasound2 \
+  libogg0 libvorbis0a libvorbisfile3 libopusfile0 \
+  libxmp4 libmpg123-0 \
+  libfluidsynth3
 
 On Fedora/RHEL:
 
@@ -67,7 +70,10 @@ sudo dnf install -y \
   libSM libICE \
   wayland wayland-client wayland-cursor \
   mesa-libEGL mesa-libGL \
-  alsa-lib
+  alsa-lib \
+  libogg libvorbis libvorbisfile opusfile \
+  libxmp mpg123 \
+  fluidsynth
 
 On Arch:
 
@@ -77,7 +83,8 @@ sudo pacman -S --needed \
   libsm libice \
   wayland \
   mesa \
-  alsa-lib
+  alsa-lib \
+  libogg libvorbis opusfile libxmp mpg123 fluidsynth
 
 You must run the game from a graphical session (Wayland or X11).
 Running from a TTY or over SSH without display forwarding will fail.
@@ -113,6 +120,28 @@ Windows installation without additional DLLs.
 - vcpkg (manifest mode)
 - Python 3.13+ (for building the launcher)
 
+### vcpkg setup (all platforms)
+
+Clone vcpkg and set `VCPKG_ROOT` in your shell before building.
+If you already have it cloned, update it first so the baseline includes the
+full audio codec ports.
+
+Linux/macOS (bash/zsh):
+
+git clone https://github.com/microsoft/vcpkg.git
+cd vcpkg
+git pull
+./bootstrap-vcpkg.sh
+export VCPKG_ROOT="$PWD"
+
+Windows (PowerShell):
+
+git clone https://github.com/microsoft/vcpkg.git
+cd vcpkg
+git pull
+.\bootstrap-vcpkg.bat
+$env:VCPKG_ROOT = (Get-Location)
+
 ---
 
 ### Windows build (MSVC)
@@ -145,7 +174,10 @@ sudo apt-get install -y \
   libsm-dev libice-dev libxtst-dev \
   libwayland-dev wayland-protocols libdecor-0-dev \
   libegl1-mesa-dev libgl1-mesa-dev \
-  libasound2-dev
+  libasound2-dev \
+  libogg-dev libvorbis-dev libopusfile-dev \
+  libxmp-dev libmpg123-dev \
+  libfluidsynth-dev
 
 On Fedora/RHEL:
 
@@ -158,7 +190,10 @@ sudo dnf install -y \
   libSM-devel libICE-devel libXtst-devel \
   wayland-devel wayland-protocols-devel libdecor-devel \
   mesa-libEGL-devel mesa-libGL-devel \
-  alsa-lib-devel
+  alsa-lib-devel \
+  libogg-devel libvorbis-devel opusfile-devel \
+  libxmp-devel mpg123-devel \
+  fluidsynth-devel
 
 On Arch:
 
@@ -170,7 +205,8 @@ sudo pacman -S --needed \
   libsm libice libxtst \
   wayland wayland-protocols libdecor \
   mesa \
-  alsa-lib
+  alsa-lib \
+  libogg libvorbis opusfile libxmp mpg123 fluidsynth
 
 #### Build steps
 

@@ -7,6 +7,8 @@ REM ============================
 if not defined BUILD_DIR set BUILD_DIR=build
 set "GAME_DIR=%BUILD_DIR%\game"
 
+if exist "%BUILD_DIR%" rmdir /s /q "%BUILD_DIR%"
+
 REM ============================
 REM Resolve vcpkg toolchain
 REM ============================
@@ -105,28 +107,51 @@ python -m pip install --upgrade pip >nul
 python -m pip install -r launcher\requirements.txt >nul
 
 echo Building launcher...
-python -m nuitka --standalone --assume-yes-for-downloads --lto=no --enable-plugin=tk-inter --include-package=customtkinter --output-dir="%BUILD_DIR%" --output-filename=launcher launcher\main.py
+set "LAUNCHER_OUT_DIR=%BUILD_DIR%\launcher_build"
+python -m nuitka --standalone --assume-yes-for-downloads --lto=no --enable-plugin=tk-inter --include-package=customtkinter --output-dir="%LAUNCHER_OUT_DIR%" --output-filename=launcher launcher\main.py
 if errorlevel 1 exit /b 1
 
-set "DIST_DIR=%BUILD_DIR%\main.dist"
+set "DIST_DIR=%LAUNCHER_OUT_DIR%\main.dist"
 if exist "%DIST_DIR%" (
     xcopy /E /I /Y "%DIST_DIR%\*" "%BUILD_DIR%\" >nul
-    rmdir /s /q "%DIST_DIR%"
+    rmdir /s /q "%LAUNCHER_OUT_DIR%"
 )
 if exist "launcher\readme.txt" (
     copy /Y "launcher\readme.txt" "%BUILD_DIR%\readme.txt" >nul
 )
 
-if exist "%BUILD_DIR%\snake.exe" (
-    move /Y "%BUILD_DIR%\snake.exe" "%GAME_DIR%\snake.exe" >nul
+set "SNAKE_PATH="
+if exist "%BUILD_DIR%\snake.exe" set "SNAKE_PATH=%BUILD_DIR%\snake.exe"
+if not defined SNAKE_PATH if exist "%BUILD_DIR%\Debug\snake.exe" set "SNAKE_PATH=%BUILD_DIR%\Debug\snake.exe"
+if not defined SNAKE_PATH if exist "%BUILD_DIR%\Release\snake.exe" set "SNAKE_PATH=%BUILD_DIR%\Release\snake.exe"
+if not defined SNAKE_PATH if exist "%BUILD_DIR%\bin\snake.exe" set "SNAKE_PATH=%BUILD_DIR%\bin\snake.exe"
+if not defined SNAKE_PATH (
+    for /r "%BUILD_DIR%" %%F in (snake.exe) do (
+        if not defined SNAKE_PATH set "SNAKE_PATH=%%F"
+    )
+)
+if not defined SNAKE_PATH (
+    echo Snake binary missing; retrying explicit build target...
+    cmake --build --preset "%PRESET%" --parallel --target snake
+    if errorlevel 1 exit /b 1
+    if exist "%BUILD_DIR%\snake.exe" set "SNAKE_PATH=%BUILD_DIR%\snake.exe"
+)
+
+if defined SNAKE_PATH (
+    move /Y "%SNAKE_PATH%" "%GAME_DIR%\snake.exe" >nul
 ) else (
-    echo ERROR: missing %BUILD_DIR%\snake.exe
+    echo ERROR: missing snake binary after build.
     exit /b 1
 )
 
 REM This is an absolute bodge and I don't like it.
 echo Copying game assets...
-copy /Y "%BUILD_DIR%\bgm.wav" "%GAME_DIR%\bgm.wav" >nul
+if exist "assets" (
+    if not exist "%GAME_DIR%\assets" mkdir "%GAME_DIR%\assets"
+    xcopy /E /I /Y "assets\*" "%GAME_DIR%\assets\" >nul
+) else (
+    echo WARN: assets folder not found. Skipping asset copy.
+)
 copy /Y "%BUILD_DIR%\*.dll" "%GAME_DIR%\" >nul
 
 echo Built: .\%BUILD_DIR%\launcher.exe
