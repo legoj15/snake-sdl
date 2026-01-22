@@ -453,16 +453,27 @@ int main(int argc, char **argv) {
       mixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
       
       if (mixer) {
-          const char *bgm_files[] = {"bgm.wav", "bgm.opus", "bgm.mp3", "bgm.flac"};
-          int num_files = sizeof(bgm_files) / sizeof(bgm_files[0]);
+          // Get the absolute path to the executable's directory
+          char *base_path = SDL_GetBasePath();
+          if (base_path) {
+              const char *bgm_files[] = {"bgm.wav", "bgm.opus", "bgm.mp3", "bgm.flac"};
+              int num_files = sizeof(bgm_files) / sizeof(bgm_files[0]);
+              char full_path[1024];
 
-          for (int i = 0; i < num_files; i++) {
-              // LoadAudio loads the file into RAM (compressed) to be decoded on the fly
-              bgm_audio = MIX_LoadAudio(mixer, bgm_files[i], false);
-              if (bgm_audio) {
-                  SDL_Log("BGM loaded: %s", bgm_files[i]);
-                  break;
+              for (int i = 0; i < num_files; i++) {
+                  // Construct absolute path: base_path includes the trailing slash
+                  snprintf(full_path, sizeof(full_path), "%s%s", base_path, bgm_files[i]);
+                  
+                  bgm_audio = MIX_LoadAudio(mixer, full_path, false);
+                  if (bgm_audio) {
+                      SDL_Log("BGM loaded: %s", full_path);
+                      break;
+                  }
               }
+              // Always free the path string returned by SDL
+              SDL_free(base_path);
+          } else {
+              SDL_Log("Could not get executable base path: %s", SDL_GetError());
           }
 
           if (bgm_audio) {
