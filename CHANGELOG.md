@@ -33,6 +33,14 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 ### Fixed
 - Exit-time memory corruption tied to base path cleanup.
 
+## [2.1.1] - 2026-01-21
+
+### Changed
+- Release packaging now zips downloaded artifacts during the release job to prevent missing uploads.
+
+### Fixed
+- Win screen now always fills the grid without intermittent blank cells.
+
 
 ## [2.0.0-hotfix.2] - 2026-01-21
 
@@ -77,7 +85,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Apple spawning and body growth.
 - Optional snapped head rendering style.
 
-[Unreleased]: https://github.com/ManifestJW/snake-sdl/compare/v2.1.0-hotfix.1...HEAD
+[Unreleased]: https://github.com/ManifestJW/snake-sdl/compare/v2.1.1...HEAD
+[2.1.1]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.1
 [2.1.0-hotfix.1]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.0-hotfix.1
 [2.1.0]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.0
 [2.0.0-hotfix.2]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.0.0-hotfix.2

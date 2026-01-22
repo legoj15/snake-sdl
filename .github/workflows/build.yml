@@ -184,18 +184,17 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: dist
-          merge-multiple: true
 
       - name: Package zips (Release)
         shell: bash
         run: |
           set -euo pipefail
           cd dist
-          if [ -d package-windows ]; then
-            (cd package-windows && python3 -m zipfile -c ../snake-windows.zip .)
+          if [ -d snake-windows ]; then
+            (cd snake-windows && python3 -m zipfile -c ../snake-windows.zip .)
           fi
-          if [ -d package-linux ]; then
-            (cd package-linux && python3 -m zipfile -c ../snake-linux.zip .)
+          if [ -d snake-linux ]; then
+            (cd snake-linux && python3 -m zipfile -c ../snake-linux.zip .)
           fi
 
       - name: Extract changelog for release

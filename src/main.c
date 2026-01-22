@@ -128,6 +128,14 @@ static void Snake_ForceWinFill(Snake *s) {
   }
 }
 
+static void Snake_SyncPrevToSeg(Snake *s) {
+  if (!s || !s->prev || !s->seg)
+    return;
+  for (int i = 0; i < s->len; i++) {
+    s->prev[i] = s->seg[i];
+  }
+}
+
 static void Game_Reset(Snake *snake, Apple *apple, int *score, int *tick_hz,
                        uint64_t *tick_ns, uint64_t *acc, bool *game_over,
                        bool *you_win, bool *interp, bool interp_setting,
@@ -700,14 +708,13 @@ int main(int argc, char **argv) {
 
           if (score >= max_score) {
             Snake_ForceWinFill(&snake);
+            Snake_SyncPrevToSeg(&snake);
             you_win = true;
 
             // Freeze pose + mode on win so the final frame stays visually
             // stable.
             freeze_interp = interp;
-            freeze_alpha = freeze_interp
-                               ? (float)clamp01((double)acc / (double)tick_ns)
-                               : 1.0f;
+            freeze_alpha = 1.0f;
 
             acc = 0;
             break;
