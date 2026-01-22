@@ -197,6 +197,9 @@ jobs:
         run: |
           set -euo pipefail
           cd dist
+          if [ -d snake-linux ]; then
+            chmod +x snake-linux/launcher snake-linux/game/snake || true
+          fi
           if [ -d snake-windows ]; then
             (cd snake-windows && zip -r ../snake-windows.zip .)
           fi

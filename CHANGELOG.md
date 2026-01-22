@@ -17,6 +17,15 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - 
 
 
+## [2.1.1-hotfix.1-test.3] - 2026-01-22
+
+### Changed
+- Audio init now tries backends one by one and continues without audio if none are available.
+- Release packaging restores Linux executable bits inside the zip artifacts.
+
+### Fixed
+- Audio backend failures are logged per backend instead of failing silently.
+
 ## [2.1.1-hotfix.1-test.2] - 2026-01-22
 
 ### Changed
@@ -101,7 +110,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Apple spawning and body growth.
 - Optional snapped head rendering style.
 
-[Unreleased]: https://github.com/ManifestJW/snake-sdl/compare/v2.1.1-hotfix.1-test.2...HEAD
+[Unreleased]: https://github.com/ManifestJW/snake-sdl/compare/v2.1.1-hotfix.1-test.3...HEAD
+[2.1.1-hotfix.1-test.3]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.1-hotfix.1-test.3
 [2.1.1-hotfix.1-test.2]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.1-hotfix.1-test.2
 [2.1.1-hotfix.1-test.1]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.1-hotfix.1-test.1
 [2.1.1]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.1
