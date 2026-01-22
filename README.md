@@ -166,6 +166,7 @@ build-windows.bat release
 
 #### Build dependencies
 
+```bash
 sudo apt-get update
 sudo apt-get install -y \
   autoconf autoconf-archive automake libtool \
