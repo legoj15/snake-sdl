@@ -17,31 +17,6 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - 
 
 
-## [2.1.1-hotfix.1-test.3] - 2026-01-22
-
-### Changed
-- Audio init now tries backends one by one and continues without audio if none are available.
-- Release packaging restores Linux executable bits inside the zip artifacts.
-
-### Fixed
-- Audio backend failures are logged per backend instead of failing silently.
-
-## [2.1.1-hotfix.1-test.2] - 2026-01-22
-
-### Changed
-- Logging initializes before SDL startup to capture early failures.
-- Linux build script now restores executable bits for `launcher` and `game/snake`.
-- Release job treats `test` tags as pre-releases.
-
-### Fixed
-- Windows build uses `localtime_s` for log timestamps.
-- Audio driver hint now includes PipeWire/PulseAudio/ALSA/Jack/OSS fallback order.
-
-## [2.1.1-hotfix.1-test.1] - 2026-01-22
-
-### Changed
-- Log output now goes to `game/logs/snake.log`.
-
 ## [2.1.1] - 2026-01-22
 
 ### Changed
@@ -110,10 +85,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Apple spawning and body growth.
 - Optional snapped head rendering style.
 
-[Unreleased]: https://github.com/ManifestJW/snake-sdl/compare/v2.1.1-hotfix.1-test.3...HEAD
-[2.1.1-hotfix.1-test.3]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.1-hotfix.1-test.3
-[2.1.1-hotfix.1-test.2]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.1-hotfix.1-test.2
-[2.1.1-hotfix.1-test.1]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.1-hotfix.1-test.1
+[Unreleased]: https://github.com/ManifestJW/snake-sdl/compare/v2.1.1...HEAD
 [2.1.1]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.1
 [2.1.0-hotfix.1]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.0-hotfix.1
 [2.1.0]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.0
