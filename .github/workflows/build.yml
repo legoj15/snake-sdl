@@ -237,4 +237,4 @@ jobs:
             dist/snake-windows.zip
             dist/snake-linux.zip
           body_path: RELEASE_NOTES.md
-          prerelease: ${{ contains(toLower(github.ref_name), 'test') }}
+          prerelease: ${{ contains(github.ref_name, 'test') || contains(github.ref_name, 'Test') || contains(github.ref_name, 'TEST') }}
