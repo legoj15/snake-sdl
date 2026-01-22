@@ -20,12 +20,12 @@ set(SDLMIXER_DEPS_SHARED OFF CACHE BOOL "Disable dynamic dependency loading" FOR
 set(SDLMIXER_OPUS_SHARED OFF CACHE BOOL "Link libopus/opusfile statically" FORCE)
 set(SDLMIXER_OPUSFILE_SHARED OFF CACHE BOOL "Link opusfile statically" FORCE)
 set(SDLMIXER_VORBIS_VORBISFILE_SHARED OFF CACHE BOOL "Link vorbisfile statically" FORCE)
-set(SDLMIXER_MPG123_SHARED OFF CACHE BOOL "Link mpg123 statically" FORCE)
-set(SDLMIXER_MIDI_FLUIDSYNTH_SHARED OFF CACHE BOOL "Link fluidsynth statically" FORCE)
-set(SDLMIXER_MOD_XMP_SHARED OFF CACHE BOOL "Link libxmp statically" FORCE)
 set(SDLMIXER_MP3_MPG123 OFF CACHE BOOL "Disable mpg123 MP3 backend" FORCE)
 set(SDLMIXER_MIDI_FLUIDSYNTH OFF CACHE BOOL "Disable FluidSynth backend" FORCE)
 set(SDLMIXER_MOD_XMP OFF CACHE BOOL "Disable libxmp MOD backend" FORCE)
+set(SDLMIXER_FLAC OFF CACHE BOOL "Disable FLAC backends" FORCE)
+set(SDLMIXER_GME OFF CACHE BOOL "Disable GME backends" FORCE)
+set(SDLMIXER_WAVPACK OFF CACHE BOOL "Disable WavPack backend" FORCE)
 
 FetchContent_Declare(
   SDL3_mixer

@@ -96,10 +96,6 @@ static MIX_Audio *load_bgm(MIX_Mixer *mixer) {
     }
   }
 
-  if (base) {
-    SDL_free((void *)base);
-  }
-
   return audio;
 }
 
@@ -479,8 +475,10 @@ int main(int argc, char **argv) {
   MIX_Mixer *mixer = NULL;
   MIX_Audio *bgm_audio = NULL;
   MIX_Track *bgm_track = NULL;
+  bool mix_inited = false;
 
   if (bgm_enabled && MIX_Init()) {
+      mix_inited = true;
       // Create a mixer connected to the default playback device
       mixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
       
@@ -794,7 +792,9 @@ int main(int argc, char **argv) {
   if (mixer) {
       MIX_DestroyMixer(mixer);
   }
-  MIX_Quit();
+  if (mix_inited) {
+      MIX_Quit();
+  }
 
   Snake_Destroy(&snake);
   App_Shutdown(&app);

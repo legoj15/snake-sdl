@@ -169,7 +169,7 @@ build-windows.bat release
 sudo apt-get update
 sudo apt-get install -y \
   autoconf autoconf-archive automake libtool \
-  pkg-config zip \
+  pkg-config \
   python3-venv python3-dev python3-tk patchelf libltdl-dev \
   libx11-dev libxext-dev libxrandr-dev libxrender-dev libxss-dev \
   libxcursor-dev libxi-dev libxinerama-dev libxkbcommon-dev \
@@ -185,7 +185,7 @@ On Fedora/RHEL:
 ```bash
 sudo dnf install -y \
   autoconf autoconf-archive automake libtool \
-  pkgconf zip \
+  pkgconf \
   python3-virtualenv python3-devel python3-tkinter patchelf libtool-ltdl-devel \
   libX11-devel libXext-devel libXrandr-devel libXrender-devel libXScrnSaver-devel \
   libXcursor-devel libXi-devel libXinerama-devel libxkbcommon-devel \
@@ -201,7 +201,7 @@ On Arch:
 ```bash
 sudo pacman -S --needed \
   autoconf autoconf-archive automake libtool \
-  pkgconf zip python python-virtualenv tk patchelf libltdl \
+  pkgconf python python-virtualenv tk patchelf libltdl \
   libx11 libxext libxrandr libxrender libxscrnsaver \
   libxcursor libxi libxinerama libxkbcommon \
   libsm libice libxtst \
