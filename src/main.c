@@ -217,18 +217,31 @@ static void Log_OpenFile(void) {
   if (exe_len > 0 && exe_len < sizeof(exe_path)) {
     char *last_sep = strrchr(exe_path, '\\');
     if (last_sep) {
-      *last_sep = '\0';
-      if (snprintf(dir_path, sizeof(dir_path), "%s\\logs", exe_path) < 0) {
-        snprintf(dir_path, sizeof(dir_path), "logs");
+      size_t base_len = (size_t)(last_sep - exe_path);
+      const char *suffix = "\\logs";
+      size_t suffix_len = strlen(suffix);
+      if (base_len + suffix_len < sizeof(dir_path)) {
+        memcpy(dir_path, exe_path, base_len);
+        memcpy(dir_path + base_len, suffix, suffix_len + 1);
+      } else {
+        memcpy(dir_path, "logs", 5);
       }
     } else {
-      snprintf(dir_path, sizeof(dir_path), "logs");
+      memcpy(dir_path, "logs", 5);
     }
   } else {
-    snprintf(dir_path, sizeof(dir_path), "logs");
+    memcpy(dir_path, "logs", 5);
   }
-  if (snprintf(path, sizeof(path), "%s\\snake.log", dir_path) < 0) {
-    snprintf(path, sizeof(path), "logs\\snake.log");
+  {
+    size_t base_len = strnlen(dir_path, sizeof(dir_path));
+    const char *suffix = "\\snake.log";
+    size_t suffix_len = strlen(suffix);
+    if (base_len + suffix_len < sizeof(path)) {
+      memcpy(path, dir_path, base_len);
+      memcpy(path + base_len, suffix, suffix_len + 1);
+    } else {
+      memcpy(path, "logs\\snake.log", 15);
+    }
   }
 #else
   snprintf(dir_path, sizeof(dir_path), "logs");

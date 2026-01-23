@@ -71,6 +71,10 @@ if (NOT WIN32)
   set_property(TARGET snake PROPERTY LINKER_LANGUAGE CXX)
 endif()
 
+if (WIN32)
+  set_target_properties(snake PROPERTIES WIN32_EXECUTABLE ON)
+endif()
+
 target_compile_options(snake PRIVATE
   $<$<C_COMPILER_ID:MSVC>:/W4>
   $<$<NOT:$<C_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic>

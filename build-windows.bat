@@ -108,7 +108,7 @@ python -m pip install -r launcher\requirements.txt >nul
 
 echo Building launcher...
 set "LAUNCHER_OUT_DIR=%BUILD_DIR%\launcher_build"
-python -m nuitka --standalone --assume-yes-for-downloads --lto=no --enable-plugin=tk-inter --include-package=customtkinter --output-dir="%LAUNCHER_OUT_DIR%" --output-filename=launcher launcher\main.py
+python -m nuitka --standalone --assume-yes-for-downloads --lto=no --windows-console-mode=disable --enable-plugin=tk-inter --include-package=customtkinter --output-dir="%LAUNCHER_OUT_DIR%" --output-filename=launcher launcher\main.py
 if errorlevel 1 exit /b 1
 
 set "DIST_DIR=%LAUNCHER_OUT_DIR%\main.dist"
