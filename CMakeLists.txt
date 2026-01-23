@@ -71,9 +71,8 @@ if (NOT WIN32)
   set_property(TARGET snake PROPERTY LINKER_LANGUAGE CXX)
 endif()
 
-if (WIN32)
-  set_target_properties(snake PROPERTIES WIN32_EXECUTABLE ON)
-endif()
+# Use console subsystem so standard main() links on Windows.
+# (WIN32_EXECUTABLE requires a WinMain entry point.)
 
 target_compile_options(snake PRIVATE
   $<$<C_COMPILER_ID:MSVC>:/W4>
