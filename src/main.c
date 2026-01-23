@@ -1,3 +1,4 @@
+#define SDL_MAIN_HANDLED
 #include <SDL3/SDL.h>
 #include <SDL3_mixer/SDL_mixer.h>
 #include <stdbool.h>
@@ -487,6 +488,7 @@ static bool parse_cycle_meta(const char *path, CycleMeta *out, char *err,
 }
 
 int main(int argc, char **argv) {
+  SDL_SetMainReady();
   // ------------------------------
   // Bot mode (off by default)
   // ------------------------------
