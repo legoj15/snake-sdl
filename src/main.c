@@ -5,6 +5,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifdef _WIN32
+#include <direct.h>
+#include <windows.h>
+#else
+#include <sys/stat.h>
+#include <sys/types.h>
+#endif
 
 #include "app.h"
 #include "apple.h"
@@ -37,7 +44,7 @@
 #define FULL_INTERP_TPS 12
 
 // Above this TPS (bot mode), disable interpolation entirely.
-#define BOT_INTERP_CUTOFF_TPS 120
+#define BOT_INTERP_CUTOFF_TPS (RENDER_CAP_HZ)
 
 static inline uint64_t ns_from_hz(int hz) {
   return (hz > 0) ? (1000000000ull / (uint64_t)hz) : 0;
@@ -167,45 +174,89 @@ static void log_to_file(void *userdata, int category, SDL_LogPriority priority,
     return;
   time_t now = time(NULL);
   struct tm tm_now;
-  localtime_r(&now, &tm_now);
+  bool has_time = true;
+#ifdef _WIN32
+  if (localtime_s(&tm_now, &now) != 0)
+    has_time = false;
+#else
+  if (!localtime_r(&now, &tm_now))
+    has_time = false;
+#endif
   char ts[32];
-  strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", &tm_now);
-  fprintf(fp, "[%s] [%s] [%d] %s\n", ts, log_priority_name(priority), category,
-          message);
+  if (has_time &&
+      strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", &tm_now) > 0) {
+    fprintf(fp, "[%s] [%s] [%d] %s\n", ts, log_priority_name(priority),
+            category, message);
+  } else {
+    fprintf(fp, "[unknown-time] [%s] [%d] %s\n", log_priority_name(priority),
+            category, message);
+  }
   fflush(fp);
 }
 
 static FILE *g_log_file = NULL;
 
+static void Log_EnsureDir(const char *path) {
+  if (!path || !*path)
+    return;
+#ifdef _WIN32
+  _mkdir(path);
+#else
+  mkdir(path, 0755);
+#endif
+}
+
 static void Log_OpenFile(void) {
   if (g_log_file)
     return;
-  const char *base = SDL_GetBasePath();
+  char dir_path[1024];
   char path[1024];
-  if (base) {
-    SDL_snprintf(path, (int)sizeof(path), "%slogs/snake.log", base);
+#ifdef _WIN32
+  char exe_path[1024];
+  DWORD exe_len = GetModuleFileNameA(NULL, exe_path, (DWORD)sizeof(exe_path));
+  if (exe_len > 0 && exe_len < sizeof(exe_path)) {
+    char *last_sep = strrchr(exe_path, '\\');
+    if (last_sep) {
+      *last_sep = '\0';
+      if (snprintf(dir_path, sizeof(dir_path), "%s\\logs", exe_path) < 0) {
+        snprintf(dir_path, sizeof(dir_path), "logs");
+      }
+    } else {
+      snprintf(dir_path, sizeof(dir_path), "logs");
+    }
   } else {
-    SDL_snprintf(path, (int)sizeof(path), "logs/snake.log");
+    snprintf(dir_path, sizeof(dir_path), "logs");
   }
-  if (base) {
-    char dir_path[1024];
-    SDL_snprintf(dir_path, (int)sizeof(dir_path), "%slogs", base);
-    SDL_CreateDirectory(dir_path);
-  } else {
-    SDL_CreateDirectory("logs");
+  if (snprintf(path, sizeof(path), "%s\\snake.log", dir_path) < 0) {
+    snprintf(path, sizeof(path), "logs\\snake.log");
   }
+#else
+  snprintf(dir_path, sizeof(dir_path), "logs");
+  snprintf(path, sizeof(path), "%s/snake.log", dir_path);
+#endif
+  Log_EnsureDir(dir_path);
+  #ifdef _WIN32
+  if (fopen_s(&g_log_file, path, "a") != 0)
+    g_log_file = NULL;
+  #else
   g_log_file = fopen(path, "a");
+  #endif
   if (g_log_file) {
     setvbuf(g_log_file, NULL, _IOLBF, 0);
-    SDL_SetLogOutputFunction(log_to_file, g_log_file);
-    SDL_Log("Logging to: %s", path);
+    fprintf(g_log_file, "Logging to: %s\n", path);
+    fflush(g_log_file);
   }
+}
+
+static void Log_AttachToSDL(void) {
+  if (!g_log_file)
+    return;
+  SDL_SetLogOutputFunction(log_to_file, g_log_file);
 }
 
 static void Log_CloseFile(void) {
   if (!g_log_file)
     return;
-  SDL_SetLogOutputFunction(NULL, NULL);
   fclose(g_log_file);
   g_log_file = NULL;
 }
@@ -549,11 +600,13 @@ int main(int argc, char **argv) {
   int init_window_h = 0;
   window_for_grid(init_grid_w, init_grid_h, &init_window_w, &init_window_h);
 
+  Log_OpenFile();
+
   App app = {0};
   if (!App_Init(&app, init_window_w, init_window_h, init_grid_w, init_grid_h)) {
     return 1;
   }
-  Log_OpenFile();
+  Log_AttachToSDL();
 
   MIX_Mixer *mixer = NULL;
   MIX_Audio *bgm_audio = NULL;

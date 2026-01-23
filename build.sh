@@ -142,5 +142,12 @@ else
   echo "WARN: assets/ not found; skipping asset copy."
 fi
 
+if [[ -f "${BUILD_DIR}/launcher" ]]; then
+  chmod +x "${BUILD_DIR}/launcher"
+fi
+if [[ -f "${GAME_DIR}/snake" ]]; then
+  chmod +x "${GAME_DIR}/snake"
+fi
+
 echo "Built: ./${BUILD_DIR}/launcher"
 echo "Built: ./${GAME_DIR}/snake"

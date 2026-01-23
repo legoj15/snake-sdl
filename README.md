@@ -48,7 +48,7 @@ This build is for x86_64 Linux only. macOS is not supported.
 #### Linux runtime dependencies
 
 The Linux binary is dynamically linked and depends on common system libraries
-(X11 / Wayland, OpenGL/EGL, and ALSA).
+(X11 / Wayland, OpenGL/EGL, and audio backends like ALSA/PulseAudio/PipeWire/Jack).
 
 On a Ubuntu / Pop!_OS system, install:
 
@@ -60,7 +60,7 @@ sudo apt-get install -y \
   libsm6 libice6 \
   libwayland-client0 libwayland-cursor0 libwayland-egl1 \
   libegl1 libgl1 \
-  libasound2 \
+  libasound2 libpulse0 libpipewire-0.3-0 libjack-jackd2-0 \
   libogg0 libvorbis0a libvorbisfile3 libopusfile0
 ```
 
@@ -73,7 +73,7 @@ sudo dnf install -y \
   libSM libICE \
   wayland wayland-client wayland-cursor \
   mesa-libEGL mesa-libGL \
-  alsa-lib \
+  alsa-lib pulseaudio-libs pipewire-libs jack-audio-connection-kit \
   libogg libvorbis libvorbisfile opusfile
 ```
 
@@ -86,7 +86,7 @@ sudo pacman -S --needed \
   libsm libice \
   wayland \
   mesa \
-  alsa-lib \
+  alsa-lib libpulse pipewire jack \
   libogg libvorbis opusfile
 ```
 
@@ -160,9 +160,11 @@ $env:VCPKG_ROOT = (Get-Location)
 
 #### Build steps
 
-git clone https://github.com/<OWNER>/<REPO>.git
+```bash
+git clone https://github.com/ManifestJW/snake-sdl.git
 cd snake-sdl
 build-windows.bat release
+```
 
 ---
 
@@ -181,7 +183,7 @@ sudo apt-get install -y \
   libsm-dev libice-dev libxtst-dev \
   libwayland-dev wayland-protocols libdecor-0-dev \
   libegl1-mesa-dev libgl1-mesa-dev \
-  libasound2-dev \
+  libasound2-dev libpulse-dev libpipewire-0.3-dev libjack-jackd2-dev \
   libogg-dev libvorbis-dev libopusfile-dev
 ```
 
@@ -197,7 +199,7 @@ sudo dnf install -y \
   libSM-devel libICE-devel libXtst-devel \
   wayland-devel wayland-protocols-devel libdecor-devel \
   mesa-libEGL-devel mesa-libGL-devel \
-  alsa-lib-devel \
+  alsa-lib-devel pulseaudio-libs-devel pipewire-devel jack-audio-connection-kit-devel \
   libogg-devel libvorbis-devel opusfile-devel
 ```
 
@@ -212,15 +214,17 @@ sudo pacman -S --needed \
   libsm libice libxtst \
   wayland wayland-protocols libdecor \
   mesa \
-  alsa-lib \
+  alsa-lib libpulse pipewire jack \
   libogg libvorbis opusfile
 ```
 
 #### Build steps
 
-git clone https://github.com/<OWNER>/<REPO>.git
+```bash
+git clone https://github.com/ManifestJW/snake-sdl.git
 cd snake-sdl
 ./build.sh release
+```
 
 ---
 

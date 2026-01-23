@@ -4,9 +4,6 @@ permissions:
   contents: write
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch: {}
 
 
@@ -118,7 +115,7 @@ jobs:
             libxtst-dev \
             libwayland-dev wayland-protocols libdecor-0-dev \
             libegl1-mesa-dev libgl1-mesa-dev \
-            libasound2-dev \
+            libasound2-dev libpulse-dev libpipewire-0.3-dev libjack-jackd2-dev \
             libogg-dev libvorbis-dev libopusfile-dev
 
       - name: Setup CMake + Ninja
@@ -170,70 +167,3 @@ jobs:
         with:
           name: snake-linux
           path: dist/package-linux
-
-  release:
-    name: Release
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
-    needs: [build-windows, build-linux]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: dist
-
-      - name: Install zip (Release)
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y zip
-
-      - name: Package zips (Release)
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd dist
-          if [ -d snake-windows ]; then
-            (cd snake-windows && zip -r ../snake-windows.zip .)
-          fi
-          if [ -d snake-linux ]; then
-            (cd snake-linux && zip -r ../snake-linux.zip .)
-          fi
-
-      - name: Extract changelog for release
-        shell: bash
-        run: |
-          set -euo pipefail
-          RAW_TAG="${GITHUB_REF_NAME}"
-          VER="${RAW_TAG#v}"
-
-          echo "Extracting changelog for tag '$RAW_TAG' (version '$VER')"
-          echo "Changelog headings found:"
-          grep -nE '^## \[' CHANGELOG.md || true
-
-          awk -v ver="$VER" -v tag="$RAW_TAG" '
-            BEGIN { found=0 }
-            {
-              line=$0
-              if (!found && (line ~ ("^## \\[" ver "\\]") || line ~ ("^## \\[" tag "\\]"))) {
-                found=1
-              } else if (found && line ~ "^## \\[") {
-                exit
-              }
-              if (found) print
-            }
-          ' CHANGELOG.md > RELEASE_NOTES.md
-
-          test -s RELEASE_NOTES.md
-
-      - name: Upload to GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/snake-windows.zip
-            dist/snake-linux.zip
-          body_path: RELEASE_NOTES.md

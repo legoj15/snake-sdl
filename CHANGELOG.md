@@ -17,6 +17,35 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - 
 
 
+## [2.1.1-hotfix.1] - 2026-01-22
+
+### Changed
+- Log output now goes to `game/logs/snake.log`.
+- Logging initializes before SDL startup to capture early failures.
+- Linux build script now restores executable bits for `launcher` and `game/snake`.
+- Audio init now tries backends one by one and continues without audio if none are available.
+- Release packaging restores Linux executable bits inside the zip artifacts.
+- Linux CI now installs PulseAudio/PipeWire/Jack dev packages to keep SDL audio backends enabled.
+
+### Fixed
+- Windows build uses `localtime_s` for log timestamps.
+- Audio driver hint now includes PipeWire/PulseAudio/ALSA/Jack/OSS fallback order.
+- Audio backend failures are logged per backend instead of failing silently.
+- Release builds no longer fail audio initialization due to missing backend packages.
+
+## [2.1.1] - 2026-01-22
+
+### Changed
+- Release packaging now zips downloaded artifacts during the release job to prevent missing uploads.
+
+### Fixed
+- Win screen now always fills the grid without intermittent blank cells.
+
+## [2.1.0-hotfix.1] - 2026-01-21
+
+### Fixed
+- Exit-time memory corruption tied to base path cleanup.
+
 ## [2.1.0] - 2026-01-21
 
 ### Added
@@ -27,24 +56,6 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 ### Changed
 - BGM assets now load from `game/assets` in the packaged build layout.
 - Build scripts copy `assets/` into the packaged game directory.
-
-## [2.1.0-hotfix.1] - 2026-01-21
-
-### Fixed
-- Exit-time memory corruption tied to base path cleanup.
-
-## [2.1.1] - 2026-01-21
-
-### Changed
-- Release packaging now zips downloaded artifacts during the release job to prevent missing uploads.
-
-### Fixed
-- Win screen now always fills the grid without intermittent blank cells.
-
-## [2.1.1-hotfix.1-test.1] - 2026-01-21
-
-### Changed
-- Log output now goes to `game/logs/snake.log`.
 
 
 ## [2.0.0-hotfix.2] - 2026-01-21
@@ -90,8 +101,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Apple spawning and body growth.
 - Optional snapped head rendering style.
 
-[Unreleased]: https://github.com/ManifestJW/snake-sdl/compare/v2.1.1-hotfix.1-test.1...HEAD
-[2.1.1-hotfix.1-test.1]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.1-hotfix.1-test.1
+[Unreleased]: https://github.com/ManifestJW/snake-sdl/compare/v2.1.1-hotfix.1...HEAD
+[2.1.1-hotfix.1]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.1-hotfix.1
 [2.1.1]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.1
 [2.1.0-hotfix.1]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.0-hotfix.1
 [2.1.0]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.0
