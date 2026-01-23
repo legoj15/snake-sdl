@@ -37,6 +37,7 @@ vcpkg/downloads/
 .vscode/
 .idea/
 *.code-workspace
+.vs/
 
 # OS junk
 .DS_Store

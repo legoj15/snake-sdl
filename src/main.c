@@ -242,7 +242,6 @@ static void Log_OpenFile(void) {
   g_log_file = fopen(path, "a");
   #endif
   if (g_log_file) {
-    setvbuf(g_log_file, NULL, _IOLBF, 0);
     fprintf(g_log_file, "Logging to: %s\n", path);
     fflush(g_log_file);
   }
