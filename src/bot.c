@@ -573,7 +573,7 @@ bool Bot_LoadCycleFromFile(Bot *b, const char *path) {
   int have = 0;
   for (char *q = data_start; *q && have < need; q++) {
     char c = *q;
-    Dir d;
+    Dir d = DIR_UP;
     bool ok = true;
     switch (c) {
     case 'U':

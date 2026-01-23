@@ -43,7 +43,7 @@
 #define FULL_INTERP_TPS 12
 
 // Above this TPS (bot mode), disable interpolation entirely.
-#define BOT_INTERP_CUTOFF_TPS 120
+#define BOT_INTERP_CUTOFF_TPS (RENDER_CAP_HZ)
 
 static inline uint64_t ns_from_hz(int hz) {
   return (hz > 0) ? (1000000000ull / (uint64_t)hz) : 0;
@@ -208,24 +208,31 @@ static void Log_EnsureDir(const char *path) {
 static void Log_OpenFile(void) {
   if (g_log_file)
     return;
-  char path[1024];
-  char dir_path[1024];
-  snprintf(dir_path, (int)sizeof(dir_path), "logs");
-  snprintf(path, (int)sizeof(path), "%s/snake.log", dir_path);
+  const char *dir_path = "logs";
+  const char *path = "logs/snake.log";
   Log_EnsureDir(dir_path);
+  #ifdef _WIN32
+  if (fopen_s(&g_log_file, path, "a") != 0)
+    g_log_file = NULL;
+  #else
   g_log_file = fopen(path, "a");
+  #endif
   if (g_log_file) {
     setvbuf(g_log_file, NULL, _IOLBF, 0);
     fprintf(g_log_file, "Logging to: %s\n", path);
     fflush(g_log_file);
-    SDL_SetLogOutputFunction(log_to_file, g_log_file);
   }
+}
+
+static void Log_AttachToSDL(void) {
+  if (!g_log_file)
+    return;
+  SDL_SetLogOutputFunction(log_to_file, g_log_file);
 }
 
 static void Log_CloseFile(void) {
   if (!g_log_file)
     return;
-  SDL_SetLogOutputFunction(NULL, NULL);
   fclose(g_log_file);
   g_log_file = NULL;
 }
@@ -575,6 +582,7 @@ int main(int argc, char **argv) {
   if (!App_Init(&app, init_window_w, init_window_h, init_grid_w, init_grid_h)) {
     return 1;
   }
+  Log_AttachToSDL();
 
   MIX_Mixer *mixer = NULL;
   MIX_Audio *bgm_audio = NULL;
