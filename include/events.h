@@ -22,6 +22,7 @@ typedef struct EventsFrame {
     bool toggle_grid;
     bool toggle_interp;   // bound to P
     bool continue_game;   // bound to L
+    bool next_track;     // NEW: Request to skip current track
 
     // One frame can produce multiple direction inputs.
     // The snake module decides how many of these to accept.

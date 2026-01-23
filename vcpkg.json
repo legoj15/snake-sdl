@@ -5,6 +5,7 @@
     "sdl3",
     "libogg",
     "libvorbis",
-    "opusfile"
+    "opusfile",
+    "curl"
   ]
 }

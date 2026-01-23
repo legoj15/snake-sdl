@@ -20,7 +20,8 @@ void Events_Poll(EventsFrame* out) {
 
     out->quit = false;
     out->toggle_grid = false;
-    out->toggle_interp = false; // NEW
+    out->toggle_interp = false;
+    out->next_track = false;
     out->dir_count = 0;
     out->continue_game = false;
 
@@ -39,8 +40,15 @@ void Events_Poll(EventsFrame* out) {
                     break;
                 }
 
-                if (e.key.scancode == SDL_SCANCODE_P) { // NEW
+                if (e.key.scancode == SDL_SCANCODE_P) {
                     out->toggle_interp = true;
+                    break;
+                }
+
+                // NEW: Media Next Track (or 'N' for debug)
+                if (e.key.scancode == SDL_SCANCODE_MEDIA_NEXT_TRACK ||
+                    e.key.scancode == SDL_SCANCODE_N) {
+                    out->next_track = true;
                     break;
                 }
 

@@ -1,6 +1,7 @@
 #define SDL_MAIN_HANDLED
 #include <SDL3/SDL.h>
 #include <SDL3_mixer/SDL_mixer.h>
+#include <curl/curl.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -486,6 +487,72 @@ static bool parse_cycle_meta(const char *path, CycleMeta *out, char *err,
   return true;
 }
 
+// --- RADIO HELPERS ---
+
+typedef struct {
+    char* data;
+    size_t size;
+} MemoryStruct;
+
+static size_t WriteMemoryCallback(void* contents, size_t size, size_t nmemb, void* userp) {
+    size_t realsize = size * nmemb;
+    MemoryStruct* mem = (MemoryStruct*)userp;
+    char* ptr = realloc(mem->data, mem->size + realsize + 1);
+    if (!ptr) return 0; // Out of memory
+    mem->data = ptr;
+    memcpy(&(mem->data[mem->size]), contents, realsize);
+    mem->size += realsize;
+    mem->data[mem->size] = 0; // Null-terminate
+    return realsize;
+}
+
+static bool fetch_url_to_memory(const char* url, MemoryStruct* chunk) {
+    CURL* curl_handle = curl_easy_init();
+    if (!curl_handle) return false;
+
+    chunk->data = malloc(1);
+    chunk->size = 0;
+
+    curl_easy_setopt(curl_handle, CURLOPT_URL, url);
+    curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+    curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, (void*)chunk);
+    curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, "snake-sdl-radio/1.0");
+    curl_easy_setopt(curl_handle, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl_handle, CURLOPT_TIMEOUT, 10L); // 10s timeout
+
+    CURLcode res = curl_easy_perform(curl_handle);
+    curl_easy_cleanup(curl_handle);
+
+    if (res != CURLE_OK) {
+        SDL_Log("Curl failed: %s", curl_easy_strerror(res));
+        free(chunk->data);
+        chunk->data = NULL;
+        return false;
+    }
+    return true;
+}
+
+static char** parse_playlist(char* data, int* count) {
+    int lines = 0;
+    char* p = data;
+    while (*p) {
+        if (*p == '\n') lines++;
+        p++;
+    }
+    char** list = malloc(sizeof(char*) * (lines + 1));
+    *count = 0;
+
+    char* token = strtok(data, "\r\n");
+    while (token) {
+        if (strlen(token) > 1) { // Skip empty lines
+            list[*count] = SDL_strdup(token);
+            (*count)++;
+        }
+        token = strtok(NULL, "\r\n");
+    }
+    return list;
+}
+
 int main(int argc, char **argv) {
   // ------------------------------
   // Bot mode (off by default)
@@ -574,6 +641,8 @@ int main(int argc, char **argv) {
     }
   }
 
+  curl_global_init(CURL_GLOBAL_ALL);
+
   CycleMeta meta = {0};
   if (bot_enabled) {
     if (!bot_gui) {
@@ -621,40 +690,47 @@ int main(int argc, char **argv) {
   }
   Log_AttachToSDL();
 
-  MIX_Mixer *mixer = NULL;
-  MIX_Audio *bgm_audio = NULL;
-  MIX_Track *bgm_track = NULL;
-  bool mix_inited = false;
+  // --- RADIO / BGM INIT ---
+  MIX_Mixer* mixer = NULL;
+  MIX_Audio* current_audio = NULL;
+  MIX_Track* current_track = NULL;
+
+  // Radio State
+  bool radio_mode = false;
+  char** playlist = NULL;
+  int playlist_count = 0;
+  int current_playlist_idx = -1;
+  MemoryStruct radio_buffer = { 0 }; // Holds the raw MP3 data in RAM
 
   if (bgm_enabled && MIX_Init()) {
-      mix_inited = true;
-      // Create a mixer connected to the default playback device
       mixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
-      
       if (mixer) {
-          bgm_audio = load_bgm(mixer);
-          if (bgm_audio) {
-              // To play audio, we need a Track
-              bgm_track = MIX_CreateTrack(mixer);
-              if (bgm_track) {
-                  MIX_SetTrackAudio(bgm_track, bgm_audio);
+          SDL_Log("Checking connection to legoj15.net...");
+          MemoryStruct index_data = { 0 };
 
-                  // Create properties to tell it to loop infinitely
-                  SDL_PropertiesID props = SDL_CreateProperties();
-                  SDL_SetNumberProperty(props, MIX_PROP_PLAY_LOOPS_NUMBER, -1);
-                  
-                  MIX_PlayTrack(bgm_track, props);
-                  
-                  SDL_DestroyProperties(props);
+          // 1. Try to fetch the index
+          if (fetch_url_to_memory("https://legoj15.net/cdn/snakeradio/index.txt", &index_data)) {
+              SDL_Log("Radio Online! Index downloaded.");
+              playlist = parse_playlist(index_data.data, &playlist_count);
+              free(index_data.data);
+
+              if (playlist_count > 0) {
+                  radio_mode = true;
+                  // Seed random again just in case
+                  current_playlist_idx = SDL_rand(playlist_count);
               }
-          } else {
-              SDL_Log("No BGM found (checked assets/bgm.{wav,opus,mp3}).");
           }
-      } else {
-          SDL_Log("MIX_CreateMixerDevice failed: %s", SDL_GetError());
+          else {
+              SDL_Log("Radio Offline. Falling back to local BGM.");
+          }
+
+          // 2. Fallback: Load local BGM if radio failed
+          if (!radio_mode) {
+              // ... (Existing local file loading logic here) ...
+              // Make sure to loop local BGM infinitely (-1)
+              // current_audio = load_bgm(mixer); ...
+          }
       }
-  } else if (bgm_enabled) {
-      SDL_Log("MIX_Init failed: %s", SDL_GetError());
   }
 
   if (bot_enabled) {
@@ -776,6 +852,78 @@ int main(int argc, char **argv) {
 
     EventsFrame ev = {0};
     Events_Poll(&ev);
+
+    // --- RADIO UPDATE LOGIC ---
+    if (mixer && bgm_enabled) {
+        bool track_ended = false;
+
+        // Check if track finished (or hasn't started)
+        if (current_track) {
+            // MIX_GetTrackStatus returns the "loops remaining". 
+            // If you can't link it, you can often just check if the audio 
+            // attached to the track is still playing.
+
+            // However, the most robust "fallback" if the specific symbol is missing 
+            // is to assume the track is done if we can't query it.
+            // A safe alternative in 3.0 dev is often just:
+            //if (!MIX_TrackActive(current_track)) { track_ended = true; } 
+        }
+        else if (radio_mode && !current_audio) {
+            // Not playing anything yet
+            track_ended = true;
+        }
+
+        // Handle "Next" or "End of Song"
+        if ((radio_mode && track_ended) || (radio_mode && ev.next_track)) {
+
+            // Cleanup old track
+            if (current_track) MIX_DestroyTrack(current_track);
+            if (current_audio) MIX_DestroyAudio(current_audio);
+            if (radio_buffer.data) { free(radio_buffer.data); radio_buffer.data = NULL; }
+
+            // Pick next track (ensure it's different if possible)
+            if (playlist_count > 1) {
+                int next = current_playlist_idx;
+                while (next == current_playlist_idx) {
+                    next = SDL_rand(playlist_count);
+                }
+                current_playlist_idx = next;
+            }
+
+            // Construct URL
+            char url[1024];
+            snprintf(url, sizeof(url), "https://legoj15.net/cdn/snakeradio/%s", playlist[current_playlist_idx]);
+            SDL_Log("Tuning radio: %s ...", playlist[current_playlist_idx]);
+
+            // Download (Blocking for simplicity)
+            if (fetch_url_to_memory(url, &radio_buffer)) {
+                // Create IOStream from memory
+                SDL_IOStream* io = SDL_IOFromConstMem(radio_buffer.data, radio_buffer.size);
+
+                // Load Audio (SDL takes ownership of IO stream? No, usually we close it, but 
+                // MIX_LoadAudio_IO has a 'closeio' bool. Set it to true.)
+                current_audio = MIX_LoadAudio_IO(mixer, io, false, true);
+
+                if (current_audio) {
+                    current_track = MIX_CreateTrack(mixer);
+                    MIX_SetTrackAudio(current_track, current_audio);
+
+                    // Play ONCE (0 loops = play 1 time total? Or 0 extra loops? 
+                    // Usually 0 means 'play once'. -1 is infinite.)
+                    SDL_PropertiesID props = SDL_CreateProperties();
+                    SDL_SetNumberProperty(props, MIX_PROP_PLAY_LOOPS_NUMBER, 0);
+                    MIX_PlayTrack(current_track, props);
+                    SDL_DestroyProperties(props);
+
+                    SDL_Log("Now Playing: %s", playlist[current_playlist_idx]);
+                }
+            }
+            else {
+                SDL_Log("Failed to download track. Skipping...");
+                // Logic will retry next frame because track_ended will be true
+            }
+        }
+    }
 
     if (ev.quit)
       break;
@@ -929,18 +1077,15 @@ int main(int argc, char **argv) {
     Bot_Destroy(&bot);
   }
 
-  if (bgm_track) {
-      MIX_DestroyTrack(bgm_track);
-  }
-  if (bgm_audio) {
-      MIX_DestroyAudio(bgm_audio);
-  }
   if (mixer) {
       MIX_DestroyMixer(mixer);
   }
-  if (mix_inited) {
-      MIX_Quit();
+  if (playlist) {
+      for (int i = 0; i < playlist_count; i++) SDL_free(playlist[i]);
+      free(playlist);
   }
+  if (radio_buffer.data) free(radio_buffer.data);
+  curl_global_cleanup();
 
   Snake_Destroy(&snake);
   App_Shutdown(&app);

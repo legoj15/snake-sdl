@@ -11,6 +11,7 @@ set(ROOT "${CMAKE_CURRENT_LIST_DIR}")
 # Dependencies
 # ------------------------------------------------------------
 find_package(SDL3 CONFIG REQUIRED)
+find_package(CURL CONFIG REQUIRED)
 include(FetchContent)
 
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libs for vendored deps" FORCE)
@@ -68,9 +69,10 @@ target_include_directories(snake PRIVATE include)
 
 # Link against SDL3 (from vcpkg) and SDL3_mixer (from FetchContent)
 if (WIN32 AND TARGET SDL3::SDL3-static)
-  target_link_libraries(snake PRIVATE SDL3::SDL3-static SDL3_mixer::SDL3_mixer)
+  # Link SDL3-static, SDL3_mixer, and LibCurl
+  target_link_libraries(snake PRIVATE SDL3::SDL3-static SDL3_mixer::SDL3_mixer CURL::libcurl)
 else()
-  target_link_libraries(snake PRIVATE SDL3::SDL3 SDL3_mixer::SDL3_mixer)
+  target_link_libraries(snake PRIVATE SDL3::SDL3 SDL3_mixer::SDL3_mixer CURL::libcurl)
 endif()
 
 if (NOT WIN32)
