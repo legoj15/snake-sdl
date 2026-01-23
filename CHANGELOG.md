@@ -17,6 +17,20 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - 
 
 
+## [2.1.2] - 2026-01-22
+
+### Added
+- Windows WinMain shim to keep GUI subsystem builds console-free while still using `main`.
+
+### Changed
+- Windows builds now use the GUI subsystem again via the WinMain shim.
+- Non-Windows builds exclude the Windows-only entry point source.
+- SDL main handling is explicitly opted out to avoid entry point conflicts.
+
+### Fixed
+- Windows logging now uses a dedicated buffer (with unbuffered fallback) to prevent CRT `setvbuf` failures.
+
+
 ## [2.1.1-hotfix.1] - 2026-01-22
 
 ### Changed
@@ -101,7 +115,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Apple spawning and body growth.
 - Optional snapped head rendering style.
 
-[Unreleased]: https://github.com/ManifestJW/snake-sdl/compare/v2.1.1-hotfix.1...HEAD
+[Unreleased]: https://github.com/ManifestJW/snake-sdl/compare/v2.1.2...HEAD
+[2.1.2]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.2
 [2.1.1-hotfix.1]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.1-hotfix.1
 [2.1.1]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.1
 [2.1.0-hotfix.1]: https://github.com/ManifestJW/snake-sdl/releases/tag/v2.1.0-hotfix.1
