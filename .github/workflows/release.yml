@@ -61,30 +61,15 @@ jobs:
           run-id: ${{ steps.find_build_run.outputs.run_id }}
           path: dist
 
-      - name: Install zip (Release)
+      - name: Rename zip artifacts
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y zip
-
-      - name: Package zips (Release)
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd dist
           SAFE_TAG="${GITHUB_REF_NAME//./_}"
-          WIN_ZIP="snake-windows-${SAFE_TAG}.zip"
-          LINUX_ZIP="snake-linux-${SAFE_TAG}.zip"
-          if [ -d snake-linux ]; then
-            chmod +x snake-linux/launcher snake-linux/game/snake || true
-          fi
-          if [ -d snake-windows ]; then
-            (cd snake-windows && zip -r "../${WIN_ZIP}" .)
-          fi
-          if [ -d snake-linux ]; then
-            (cd snake-linux && zip -r "../${LINUX_ZIP}" .)
-          fi
+          while IFS= read -r -d '' zip; do
+            base="$(basename "$zip" .zip)"
+            mv -f "$zip" "dist/${base}-${SAFE_TAG}.zip"
+          done < <(find dist -name '*.zip' -print0)
 
       - name: Extract changelog for release
         shell: bash
