@@ -197,6 +197,7 @@ static void log_to_file(void *userdata, int category, SDL_LogPriority priority,
 }
 
 static FILE *g_log_file = NULL;
+static char g_log_buffer[1024];
 
 static void Log_EnsureDir(const char *path) {
   if (!path || !*path)
@@ -257,6 +258,9 @@ static void Log_OpenFile(void) {
   g_log_file = fopen(path, "a");
   #endif
   if (g_log_file) {
+    if (setvbuf(g_log_file, g_log_buffer, _IOLBF, sizeof(g_log_buffer)) != 0) {
+      setvbuf(g_log_file, NULL, _IONBF, 0);
+    }
     fprintf(g_log_file, "Logging to: %s\n", path);
     fflush(g_log_file);
   }

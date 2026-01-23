@@ -132,21 +132,25 @@ so make sure your vcpkg checkout includes that commit.
 
 Linux/macOS (bash/zsh):
 
+```bash
 git clone https://github.com/microsoft/vcpkg.git
 cd vcpkg
 git fetch --tags
 git checkout 01e159b519b7e791cc5bb3548663a26d9c0922a3
 ./bootstrap-vcpkg.sh
 export VCPKG_ROOT="$PWD"
+```
 
 Windows (PowerShell):
 
+```powershell
 git clone https://github.com/microsoft/vcpkg.git
 cd vcpkg
 git fetch --tags
 git checkout 01e159b519b7e791cc5bb3548663a26d9c0922a3
 .\bootstrap-vcpkg.bat
 $env:VCPKG_ROOT = (Get-Location)
+```
 
 ---
 
