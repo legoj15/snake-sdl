@@ -7,6 +7,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Optional build.yml run id to pull artifacts from"
+        required: false
+        type: string
 
 jobs:
   release:
@@ -21,6 +27,12 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            const inputRunId = core.getInput("run_id");
+            if (inputRunId) {
+              core.notice(`Using user-supplied run_id ${inputRunId}`);
+              core.setOutput("run_id", inputRunId);
+              return;
+            }
             const { owner, repo } = context.repo;
             const headSha = context.sha;
             const runs = await github.rest.actions.listWorkflowRuns({
