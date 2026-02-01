@@ -15,6 +15,10 @@
 #include <sys/types.h>
 #endif
 
+#include "imgui.h"
+#include "imgui_impl_sdl3.h"
+#include "imgui_impl_sdlrenderer3.h"
+
 #include "app.h"
 #include "apple.h"
 #include "bot.h"
@@ -152,20 +156,20 @@ static void Snake_SyncPrevToSeg(Snake *s) {
 
 static const char *log_priority_name(SDL_LogPriority priority) {
   switch (priority) {
-    case SDL_LOG_PRIORITY_VERBOSE:
-      return "VERBOSE";
-    case SDL_LOG_PRIORITY_DEBUG:
-      return "DEBUG";
-    case SDL_LOG_PRIORITY_INFO:
-      return "INFO";
-    case SDL_LOG_PRIORITY_WARN:
-      return "WARN";
-    case SDL_LOG_PRIORITY_ERROR:
-      return "ERROR";
-    case SDL_LOG_PRIORITY_CRITICAL:
-      return "CRITICAL";
-    default:
-      return "LOG";
+  case SDL_LOG_PRIORITY_VERBOSE:
+    return "VERBOSE";
+  case SDL_LOG_PRIORITY_DEBUG:
+    return "DEBUG";
+  case SDL_LOG_PRIORITY_INFO:
+    return "INFO";
+  case SDL_LOG_PRIORITY_WARN:
+    return "WARN";
+  case SDL_LOG_PRIORITY_ERROR:
+    return "ERROR";
+  case SDL_LOG_PRIORITY_CRITICAL:
+    return "CRITICAL";
+  default:
+    return "LOG";
   }
 }
 
@@ -185,8 +189,7 @@ static void log_to_file(void *userdata, int category, SDL_LogPriority priority,
     has_time = false;
 #endif
   char ts[32];
-  if (has_time &&
-      strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", &tm_now) > 0) {
+  if (has_time && strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", &tm_now) > 0) {
     fprintf(fp, "[%s] [%s] [%d] %s\n", ts, log_priority_name(priority),
             category, message);
   } else {
@@ -251,12 +254,12 @@ static void Log_OpenFile(void) {
   snprintf(path, sizeof(path), "%s/snake.log", dir_path);
 #endif
   Log_EnsureDir(dir_path);
-  #ifdef _WIN32
+#ifdef _WIN32
   if (fopen_s(&g_log_file, path, "a") != 0)
     g_log_file = NULL;
-  #else
+#else
   g_log_file = fopen(path, "a");
-  #endif
+#endif
   if (g_log_file) {
     if (setvbuf(g_log_file, g_log_buffer, _IOLBF, sizeof(g_log_buffer)) != 0) {
       setvbuf(g_log_file, NULL, _IONBF, 0);
@@ -296,8 +299,7 @@ static void Game_Reset(Snake *snake, Apple *apple, int *score, int *tick_hz,
 
   Apple_Init(apple, snake);
 
-  *tick_hz =
-      (bot_enabled && bot_tps > 0) ? bot_tps : tick_hz_for_score(*score);
+  *tick_hz = (bot_enabled && bot_tps > 0) ? bot_tps : tick_hz_for_score(*score);
   *tick_ns = ns_from_hz(*tick_hz);
   *acc = 0;
 
@@ -494,70 +496,75 @@ static bool parse_cycle_meta(const char *path, CycleMeta *out, char *err,
 // --- RADIO HELPERS ---
 
 typedef struct {
-    char* data;
-    size_t size;
+  char *data;
+  size_t size;
 } MemoryStruct;
 
-static size_t WriteMemoryCallback(void* contents, size_t size, size_t nmemb, void* userp) {
-    size_t realsize = size * nmemb;
-    MemoryStruct* mem = (MemoryStruct*)userp;
-    char* ptr = realloc(mem->data, mem->size + realsize + 1);
-    if (!ptr) return 0; // Out of memory
-    mem->data = ptr;
-    memcpy(&(mem->data[mem->size]), contents, realsize);
-    mem->size += realsize;
-    mem->data[mem->size] = 0; // Null-terminate
-    return realsize;
+static size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb,
+                                  void *userp) {
+  size_t realsize = size * nmemb;
+  MemoryStruct *mem = (MemoryStruct *)userp;
+  char *ptr = (char *)realloc(mem->data, mem->size + realsize + 1);
+  if (!ptr)
+    return 0; // Out of memory
+  mem->data = ptr;
+  memcpy(&(mem->data[mem->size]), contents, realsize);
+  mem->size += realsize;
+  mem->data[mem->size] = 0; // Null-terminate
+  return realsize;
 }
 
-static bool fetch_url_to_memory(const char* url, MemoryStruct* chunk) {
-    CURL* curl_handle = curl_easy_init();
-    if (!curl_handle) return false;
+static bool fetch_url_to_memory(const char *url, MemoryStruct *chunk) {
+  CURL *curl_handle = curl_easy_init();
+  if (!curl_handle)
+    return false;
 
-    chunk->data = malloc(1);
-    chunk->size = 0;
+  chunk->data = (char *)malloc(1);
+  chunk->size = 0;
 
-    curl_easy_setopt(curl_handle, CURLOPT_URL, url);
-    curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
-    curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, (void*)chunk);
-    curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, "snake-sdl-radio/1.0");
-    curl_easy_setopt(curl_handle, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl_handle, CURLOPT_TIMEOUT, 10L); // 10s timeout
+  curl_easy_setopt(curl_handle, CURLOPT_URL, url);
+  curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
+  curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, (void *)chunk);
+  curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, "snake-sdl-radio/1.0");
+  curl_easy_setopt(curl_handle, CURLOPT_FOLLOWLOCATION, 1L);
+  curl_easy_setopt(curl_handle, CURLOPT_TIMEOUT, 10L); // 10s timeout
 
-    CURLcode res = curl_easy_perform(curl_handle);
-    curl_easy_cleanup(curl_handle);
+  CURLcode res = curl_easy_perform(curl_handle);
+  curl_easy_cleanup(curl_handle);
 
-    if (res != CURLE_OK) {
-        SDL_Log("Curl failed: %s", curl_easy_strerror(res));
-        free(chunk->data);
-        chunk->data = NULL;
-        return false;
-    }
-    return true;
+  if (res != CURLE_OK) {
+    SDL_Log("Curl failed: %s", curl_easy_strerror(res));
+    free(chunk->data);
+    chunk->data = NULL;
+    return false;
+  }
+  return true;
 }
 
-static char** parse_playlist(char* data, int* count) {
-    int lines = 0;
-    char* p = data;
-    while (*p) {
-        if (*p == '\n') lines++;
-        p++;
-    }
-    char** list = malloc(sizeof(char*) * (lines + 1));
-    *count = 0;
+static char **parse_playlist(char *data, int *count) {
+  int lines = 0;
+  char *p = data;
+  while (*p) {
+    if (*p == '\n')
+      lines++;
+    p++;
+  }
+  char **list = (char **)malloc(sizeof(char *) * (lines + 1));
+  *count = 0;
 
-    char* token = strtok(data, "\r\n");
-    while (token) {
-        if (strlen(token) > 1) { // Skip empty lines
-            list[*count] = SDL_strdup(token);
-            (*count)++;
-        }
-        token = strtok(NULL, "\r\n");
+  char *token = strtok(data, "\r\n");
+  while (token) {
+    if (strlen(token) > 1) { // Skip empty lines
+      list[*count] = SDL_strdup(token);
+      (*count)++;
     }
-    return list;
+    token = strtok(NULL, "\r\n");
+  }
+  return list;
 }
 
 int main(int argc, char **argv) {
+  App app = {0};
   // ------------------------------
   // Bot mode (off by default)
   // ------------------------------
@@ -642,6 +649,8 @@ int main(int argc, char **argv) {
       i++;
     } else if (arg_eq(argv[i], "--no-bgm")) {
       bgm_enabled = false;
+    } else if (arg_eq(argv[i], "--debug")) {
+      app.is_debug = true;
     }
   }
 
@@ -688,53 +697,52 @@ int main(int argc, char **argv) {
 
   Log_OpenFile();
 
-  App app = {0};
   if (!App_Init(&app, init_window_w, init_window_h, init_grid_w, init_grid_h)) {
     return 1;
   }
   Log_AttachToSDL();
 
   // --- RADIO / BGM INIT ---
-  MIX_Mixer* mixer = NULL;
-  MIX_Audio* current_audio = NULL;
-  MIX_Track* current_track = NULL;
+  MIX_Mixer *mixer = NULL;
+  MIX_Audio *current_audio = NULL;
+  MIX_Track *current_track = NULL;
 
   // Radio State
   bool radio_mode = false;
-  char** playlist = NULL;
+  char **playlist = NULL;
   int playlist_count = 0;
   int current_playlist_idx = -1;
-  MemoryStruct radio_buffer = { 0 }; // Holds the raw MP3 data in RAM
+  MemoryStruct radio_buffer = {0}; // Holds the raw MP3 data in RAM
 
   if (bgm_enabled && MIX_Init()) {
-      mixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
-      if (mixer) {
-          SDL_Log("Checking connection to legoj15.net...");
-          MemoryStruct index_data = { 0 };
+    mixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
+    if (mixer) {
+      SDL_Log("Checking connection to legoj15.net...");
+      MemoryStruct index_data = {0};
 
-          // 1. Try to fetch the index
-          if (fetch_url_to_memory("https://legoj15.net/cdn/snakeradio/index.txt", &index_data)) {
-              SDL_Log("Radio Online! Index downloaded.");
-              playlist = parse_playlist(index_data.data, &playlist_count);
-              free(index_data.data);
+      // 1. Try to fetch the index
+      if (fetch_url_to_memory("https://legoj15.net/cdn/snakeradio/index.txt",
+                              &index_data)) {
+        SDL_Log("Radio Online! Index downloaded.");
+        playlist = parse_playlist(index_data.data, &playlist_count);
+        free(index_data.data);
 
-              if (playlist_count > 0) {
-                  radio_mode = true;
-                  // Seed random again just in case
-                  current_playlist_idx = SDL_rand(playlist_count);
-              }
-          }
-          else {
-              SDL_Log("Radio Offline. Falling back to local BGM.");
-          }
-
-          // 2. Fallback: Load local BGM if radio failed
-          if (!radio_mode) {
-              // ... (Existing local file loading logic here) ...
-              // Make sure to loop local BGM infinitely (-1)
-              // current_audio = load_bgm(mixer); ...
-          }
+        if (playlist_count > 0) {
+          radio_mode = true;
+          // Seed random again just in case
+          current_playlist_idx = SDL_rand(playlist_count);
+        }
+      } else {
+        SDL_Log("Radio Offline. Falling back to local BGM.");
       }
+
+      // 2. Fallback: Load local BGM if radio failed
+      if (!radio_mode) {
+        // ... (Existing local file loading logic here) ...
+        // Make sure to loop local BGM infinitely (-1)
+        // current_audio = load_bgm(mixer); ...
+      }
+    }
   }
 
   if (bot_enabled) {
@@ -855,78 +863,89 @@ int main(int argc, char **argv) {
     acc += dt;
 
     EventsFrame ev = {0};
-    Events_Poll(&ev);
+
+    // Unified Event Loop
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+      ImGui_ImplSDL3_ProcessEvent(&event);
+      Events_ProcessEvent(&ev, &event);
+    }
 
     // --- RADIO UPDATE LOGIC ---
     if (mixer && bgm_enabled) {
-        bool track_ended = false;
+      bool track_ended = false;
 
-        // Check if track finished (or hasn't started)
-        if (current_track) {
-            // MIX_GetTrackStatus returns the "loops remaining". 
-            // If you can't link it, you can often just check if the audio 
-            // attached to the track is still playing.
+      // Check if track finished (or hasn't started)
+      if (current_track) {
+        // MIX_GetTrackStatus returns the "loops remaining".
+        // If you can't link it, you can often just check if the audio
+        // attached to the track is still playing.
 
-            // However, the most robust "fallback" if the specific symbol is missing 
-            // is to assume the track is done if we can't query it.
-            // A safe alternative in 3.0 dev is often just:
-            //if (!MIX_TrackActive(current_track)) { track_ended = true; } 
+        // However, the most robust "fallback" if the specific symbol is missing
+        // is to assume the track is done if we can't query it.
+        // A safe alternative in 3.0 dev is often just:
+        // if (!MIX_TrackActive(current_track)) { track_ended = true; }
+      } else if (radio_mode && !current_audio) {
+        // Not playing anything yet
+        track_ended = true;
+      }
+
+      // Handle "Next" or "End of Song"
+      if ((radio_mode && track_ended) || (radio_mode && ev.next_track)) {
+
+        // Cleanup old track
+        if (current_track)
+          MIX_DestroyTrack(current_track);
+        if (current_audio)
+          MIX_DestroyAudio(current_audio);
+        if (radio_buffer.data) {
+          free(radio_buffer.data);
+          radio_buffer.data = NULL;
         }
-        else if (radio_mode && !current_audio) {
-            // Not playing anything yet
-            track_ended = true;
+
+        // Pick next track (ensure it's different if possible)
+        if (playlist_count > 1) {
+          int next = current_playlist_idx;
+          while (next == current_playlist_idx) {
+            next = SDL_rand(playlist_count);
+          }
+          current_playlist_idx = next;
         }
 
-        // Handle "Next" or "End of Song"
-        if ((radio_mode && track_ended) || (radio_mode && ev.next_track)) {
+        // Construct URL
+        char url[1024];
+        snprintf(url, sizeof(url), "https://legoj15.net/cdn/snakeradio/%s",
+                 playlist[current_playlist_idx]);
+        SDL_Log("Tuning radio: %s ...", playlist[current_playlist_idx]);
 
-            // Cleanup old track
-            if (current_track) MIX_DestroyTrack(current_track);
-            if (current_audio) MIX_DestroyAudio(current_audio);
-            if (radio_buffer.data) { free(radio_buffer.data); radio_buffer.data = NULL; }
+        // Download (Blocking for simplicity)
+        if (fetch_url_to_memory(url, &radio_buffer)) {
+          // Create IOStream from memory
+          SDL_IOStream *io =
+              SDL_IOFromConstMem(radio_buffer.data, radio_buffer.size);
 
-            // Pick next track (ensure it's different if possible)
-            if (playlist_count > 1) {
-                int next = current_playlist_idx;
-                while (next == current_playlist_idx) {
-                    next = SDL_rand(playlist_count);
-                }
-                current_playlist_idx = next;
-            }
+          // Load Audio (SDL takes ownership of IO stream? No, usually we close
+          // it, but MIX_LoadAudio_IO has a 'closeio' bool. Set it to true.)
+          current_audio = MIX_LoadAudio_IO(mixer, io, false, true);
 
-            // Construct URL
-            char url[1024];
-            snprintf(url, sizeof(url), "https://legoj15.net/cdn/snakeradio/%s", playlist[current_playlist_idx]);
-            SDL_Log("Tuning radio: %s ...", playlist[current_playlist_idx]);
+          if (current_audio) {
+            current_track = MIX_CreateTrack(mixer);
+            MIX_SetTrackAudio(current_track, current_audio);
 
-            // Download (Blocking for simplicity)
-            if (fetch_url_to_memory(url, &radio_buffer)) {
-                // Create IOStream from memory
-                SDL_IOStream* io = SDL_IOFromConstMem(radio_buffer.data, radio_buffer.size);
+            // Play ONCE (0 loops = play 1 time total? Or 0 extra loops?
+            // Usually 0 means 'play once'. -1 is infinite.)
+            SDL_PropertiesID props = SDL_CreateProperties();
+            SDL_SetNumberProperty(props, MIX_PROP_PLAY_LOOPS_NUMBER, 0);
+            MIX_PlayTrack(current_track, props);
+            SDL_DestroyProperties(props);
 
-                // Load Audio (SDL takes ownership of IO stream? No, usually we close it, but 
-                // MIX_LoadAudio_IO has a 'closeio' bool. Set it to true.)
-                current_audio = MIX_LoadAudio_IO(mixer, io, false, true);
-
-                if (current_audio) {
-                    current_track = MIX_CreateTrack(mixer);
-                    MIX_SetTrackAudio(current_track, current_audio);
-
-                    // Play ONCE (0 loops = play 1 time total? Or 0 extra loops? 
-                    // Usually 0 means 'play once'. -1 is infinite.)
-                    SDL_PropertiesID props = SDL_CreateProperties();
-                    SDL_SetNumberProperty(props, MIX_PROP_PLAY_LOOPS_NUMBER, 0);
-                    MIX_PlayTrack(current_track, props);
-                    SDL_DestroyProperties(props);
-
-                    SDL_Log("Now Playing: %s", playlist[current_playlist_idx]);
-                }
-            }
-            else {
-                SDL_Log("Failed to download track. Skipping...");
-                // Logic will retry next frame because track_ended will be true
-            }
+            SDL_Log("Now Playing: %s", playlist[current_playlist_idx]);
+          }
+        } else {
+          SDL_Log("Failed to download track. Skipping...");
+          // Logic will retry next frame because track_ended will be true
         }
+      }
     }
 
     if (ev.quit)
@@ -1057,6 +1076,96 @@ int main(int argc, char **argv) {
       SnakeDraw_Render(&app, &snake, alpha, style_green);
     }
 
+    // --- IMGUI OVERLAYS ---
+    ImGui_ImplSDLRenderer3_NewFrame();
+    ImGui_ImplSDL3_NewFrame();
+    ImGui::NewFrame();
+
+    if (app.is_debug) {
+      ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_Always);
+      ImGui::Begin("Debug Overlay", NULL,
+                   ImGuiWindowFlags_NoDecoration |
+                       ImGuiWindowFlags_AlwaysAutoResize |
+                       ImGuiWindowFlags_NoSavedSettings |
+                       ImGuiWindowFlags_NoFocusOnAppearing |
+                       ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove);
+      ImGui::Text("TPS: %d", tick_hz);
+      ImGui::Text("FPS: %.1f", fps.fps);
+      ImGui::Text("Interp: %s", interp ? "ON" : "OFF");
+      ImGui::End();
+    }
+
+    if (radio_mode && current_playlist_idx >= 0) {
+      ImGui::SetNextWindowPos(ImVec2((float)app.window_w - 10, 10),
+                              ImGuiCond_Always, ImVec2(1.0f, 0.0f));
+      ImGui::Begin("Track Overlay", NULL,
+                   ImGuiWindowFlags_NoDecoration |
+                       ImGuiWindowFlags_AlwaysAutoResize |
+                       ImGuiWindowFlags_NoSavedSettings |
+                       ImGuiWindowFlags_NoFocusOnAppearing |
+                       ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove);
+      ImGui::Text("Now Playing:");
+      ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "%s",
+                         playlist[current_playlist_idx]);
+      ImGui::End();
+    }
+
+    static bool show_settings = false;
+    if (ev.toggle_ui)
+      show_settings = !show_settings;
+
+    if (show_settings) {
+      ImGui::Begin("Settings", &show_settings);
+
+      if (ImGui::CollapsingHeader("Display", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Checkbox("Show Grid (G)", &show_grid);
+        ImGui::Checkbox("Interpolation (P)", &interp_setting);
+        if (!(bot_enabled && bot_tps >= BOT_INTERP_CUTOFF_TPS)) {
+          interp = interp_setting;
+        }
+      }
+
+      if (ImGui::CollapsingHeader("Radio", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (radio_mode) {
+          ImGui::Text("Current: %s", playlist[current_playlist_idx]);
+          if (ImGui::Button("Next Track (N)")) {
+            ev.next_track = true;
+          }
+        } else {
+          ImGui::Text("Radio Offline");
+        }
+      }
+
+      if (ImGui::CollapsingHeader("Bot", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Checkbox("Bot Enabled", &bot_enabled);
+        if (bot_enabled) {
+          ImGui::SliderInt("Bot TPS", &bot_tps, 7, 7000);
+          tick_ns = ns_from_hz(bot_tps);
+        }
+      }
+
+      ImGui::End();
+    }
+
+    // Process UI-driven logic changes
+    if (ev.toggle_grid)
+      show_grid = !show_grid;
+    if (ev.toggle_interp) {
+      if (!(bot_enabled && bot_tps >= BOT_INTERP_CUTOFF_TPS)) {
+        interp_setting = !interp_setting;
+        interp = interp_setting;
+      }
+    }
+
+    if (show_settings || ImGui::GetIO().WantCaptureMouse) {
+      SDL_ShowCursor();
+    } else {
+      SDL_HideCursor();
+    }
+
+    ImGui::Render();
+    ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), app.renderer);
+
     Render_Present(app.renderer);
 
     Fps_OnFrame(&fps);
@@ -1082,13 +1191,15 @@ int main(int argc, char **argv) {
   }
 
   if (mixer) {
-      MIX_DestroyMixer(mixer);
+    MIX_DestroyMixer(mixer);
   }
   if (playlist) {
-      for (int i = 0; i < playlist_count; i++) SDL_free(playlist[i]);
-      free(playlist);
+    for (int i = 0; i < playlist_count; i++)
+      SDL_free(playlist[i]);
+    free(playlist);
   }
-  if (radio_buffer.data) free(radio_buffer.data);
+  if (radio_buffer.data)
+    free(radio_buffer.data);
   curl_global_cleanup();
 
   Snake_Destroy(&snake);

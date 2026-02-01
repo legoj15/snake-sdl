@@ -1,101 +1,75 @@
 #pragma once
 
-#include <stdbool.h>
-#include <stdint.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include "apple.h"
 #include "snake.h"
+#include <stdint.h>
 
-/*
- * bot.h
- *
- * A "perfect" autoplayer intended to be entertaining to watch.
- *
- * Strategy (high level):
- *  1) Follow a Hamiltonian cycle over the whole board.
- *  2) The cycle is precomputed and stored as a sequence of directions.
- *
- * Bot mode is meant to be embedded in-game and launched via the GUI.
- */
-
+// Bot tuning parameters.
 typedef struct BotTuning {
-  // Scoring weights for shortcut selection (safety checks remain enforced).
-  double k_progress;
-  double k_away;
-  double k_skip;
-  double k_slack;
-  double k_loop;
-  double aggression_scale;
-  int loop_window;
-  int max_skip_cap;
+  double k_progress;       // Weight for moving toward apple.
+  double k_away;           // Weight for moving away from snake body.
+  double k_skip;           // Weight for skipping steps in cycle (pathfinding).
+  double k_slack;          // Slack for pathfinding.
+  double k_loop;           // Weight for cycle length.
+  int loop_window;         // Search window for cycles.
+  double aggression_scale; // How aggressively to move toward apple.
+  int max_skip_cap;        // Max segments to skip in cycle.
 } BotTuning;
+
+typedef enum Preset {
+  PRESET_SAFE,
+  PRESET_FAST,
+  PRESET_AGGRESSIVE,
+  PRESET_GREEDY_APPLE,
+  PRESET_CHAOTIC
+} Preset;
 
 typedef struct Bot {
   int grid_w, grid_h;
   int n_cells;
 
-  // For each cell (y*grid_w+x), what direction advances to the next cell
-  // on the cycle?
   Dir *cycle_next_dir;
-
-  // Index of each cell along the cycle (0..n_cells-1), starting from the
-  // top-right corner.
   int *cycle_index;
-
-  // Reverse lookup: cycle index -> position.
   IVec2 *pos_of_idx;
-
-  // Next cycle index for each cycle index (ordering only).
   int *next_cycle_idx;
-
-  // Full cycle as a sequence of directions, starting at top-right.
   Dir *cycle_dirs;
+  uint8_t *occupied_idx;
+  int *last_visit_idx;
+
   int cycle_pos;
 
-  bool cycle_wrap;
-
-  // Occupancy by cycle index for fast local safety checks.
-  uint8_t *occupied_idx;
-
-  // Loop avoidance: last tick a cycle index was visited by the head.
-  int *last_visit_idx;
-  uint32_t tick;
-
-  // Debug: log when a shortcut is taken.
   bool debug_shortcuts;
+  uint32_t tick;
+  bool cycle_wrap;
 
   BotTuning tuning;
 } Bot;
 
-typedef enum Preset {
-  PRESET_SAFE = 0,
-  PRESET_AGGRESSIVE = 1,
-  PRESET_GREEDY_APPLE = 2,
-  PRESET_CHAOTIC = 3
-} Preset;
-
-// Initialize with a default built-in Hamiltonian cycle.
+// Allocates cycle array.
 bool Bot_Init(Bot *b, int grid_w, int grid_h);
 
-// Optional: load a custom cycle from a ".cycle" container file.
-// The loader refuses any non-.cycle path.
-//
-// Format:
-//   SNAKECYCLE 1
-//   key=value (optional, e.g. width=40)
-//   DATA
-//   U/D/L/R direction letters (whitespace ignored), row-major
-bool Bot_LoadCycleFromFile(Bot *b, const char *path);
-
+// Frees bot resources.
 void Bot_Destroy(Bot *b);
 
-// Called once per simulation tick (right before Snake_Tick). This function
-// queues at most one direction change into the snake.
+// Loads a pre-baked cycle from a .cycle file.
+bool Bot_LoadCycleFromFile(Bot *b, const char *path);
+
+// Updates the bot instance for the current tick.
 void Bot_OnTick(Bot *b, Snake *s, const Apple *a);
 
-// Preset helpers for tuning.
-void apply_preset(Preset p, BotTuning *t);
-bool preset_matches_current(Preset p, const BotTuning *t, double epsilon);
+// Helper to parse preset name from string.
+bool parse_preset_name(const char *name, Preset *p);
 
-// Apply tuning values (clamped for safety).
-void Bot_SetTuning(Bot *b, const BotTuning *t);
+// Applies a tuning preset.
+void apply_preset(Preset p, BotTuning *tuning);
+
+// Applies current bot tuning parameters to the bot instance.
+void Bot_SetTuning(Bot *b, const BotTuning *tuning);
+
+#ifdef __cplusplus
+}
+#endif

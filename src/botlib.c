@@ -1,13 +1,12 @@
 #include "botlib.h"
 
 #include <ctype.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
-#include <stdbool.h>
 
-typedef struct { int x, y; } IVec2;
 
 typedef enum {
   CYCLE_SERPENTINE = 0,
@@ -162,8 +161,8 @@ static int dirs_to_next(int w, int h, const char *dirs, bool wrap, int *next,
   return 0;
 }
 
-static int next_to_dirs(int w, int h, const int *next, bool wrap, char *out_dirs,
-                        char *err, int err_len) {
+static int next_to_dirs(int w, int h, const int *next, bool wrap,
+                        char *out_dirs, char *err, int err_len) {
   if (!next || !out_dirs) {
     set_err(err, err_len, "next/out_dirs must be non-null");
     return 1;
@@ -274,9 +273,7 @@ static uint32_t rng_next(Rng *r) {
   return r->state;
 }
 
-static int rng_range(Rng *r, int n) {
-  return (int)(rng_next(r) % (uint32_t)n);
-}
+static int rng_range(Rng *r, int n) { return (int)(rng_next(r) % (uint32_t)n); }
 
 static void shuffle_dirs(int *dirs, int count, Rng *rng) {
   for (int i = count - 1; i > 0; i--) {
@@ -622,8 +619,8 @@ static int gen_cycle_maze(int w, int h, unsigned int seed, bool wrap,
 
 // Generate into out_dirs (size w*h). Returns 0 on success.
 // Apply valid edge swaps to mutate an existing Hamiltonian cycle.
-static int scramble_cycle(int w, int h, int *next, bool wrap,
-                          unsigned int seed, char *err, int err_len) {
+static int scramble_cycle(int w, int h, int *next, bool wrap, unsigned int seed,
+                          char *err, int err_len) {
   int n = w * h;
   if (!next) {
     set_err(err, err_len, "next buffer is required");
@@ -651,10 +648,10 @@ static int scramble_cycle(int w, int h, int *next, bool wrap,
     IVec2 pc = {c % w, c / w};
     IVec2 pd = {d % w, d / w};
 
-    bool adj_ad = wrap ? is_adjacent_wrap(pa, pd, w, h)
-                       : is_adjacent_nonwrap(pa, pd);
-    bool adj_cb = wrap ? is_adjacent_wrap(pc, pb, w, h)
-                       : is_adjacent_nonwrap(pc, pb);
+    bool adj_ad =
+        wrap ? is_adjacent_wrap(pa, pd, w, h) : is_adjacent_nonwrap(pa, pd);
+    bool adj_cb =
+        wrap ? is_adjacent_wrap(pc, pb, w, h) : is_adjacent_nonwrap(pc, pb);
     if (!adj_ad || !adj_cb)
       continue;
 
@@ -960,8 +957,7 @@ int snakebot_build_cycle_file_ex(int w, int h, int window_w, int window_h,
                        "wrap=%d\n"
                        "DATA\n",
                        w, h, window_w, window_h, seed,
-                       cycle_type ? cycle_type : "maze",
-                       wrap_used ? 1 : 0);
+                       cycle_type ? cycle_type : "maze", wrap_used ? 1 : 0);
   if (wrote < 0) {
     set_err(err, err_len, "snprintf failed");
     return 5;

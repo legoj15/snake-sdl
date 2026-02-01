@@ -1,5 +1,12 @@
 #pragma once
 
+#include "snake.h"
+#include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * apple.h
  *
@@ -15,17 +22,18 @@
  *        board.
  */
 
-#include <stdbool.h>
-#include "snake.h"
-
 typedef struct Apple {
-    IVec2 pos;   // Grid position in cells.
+  IVec2 pos; // Grid position in cells.
 } Apple;
 
 // Picks an initial position not occupied by the snake.
-void Apple_Init(Apple* a, const Snake* s);
+void Apple_Init(Apple *a, const Snake *s);
 
 // Checks whether the snake head is on the apple.
 // If so, schedules growth (via Snake_AddGrowth) and respawns the apple.
 // Returns true if the apple was eaten.
-bool Apple_TryEatAndRespawn(Apple* a, Snake* s);
+bool Apple_TryEatAndRespawn(Apple *a, Snake *s);
+
+#ifdef __cplusplus
+}
+#endif

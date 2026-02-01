@@ -1,35 +1,39 @@
 #pragma once
 
+#include "snake.h"
+#include <SDL3/SDL.h>
+#include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * events.h
  *
- * Input in this project is “frame-based”: each rendered frame we poll SDL,
- * translate raw events into a small, game-friendly struct, and then the game
- * loop decides what to do with it.
- *
- * Why not push events directly into the snake/game state?
- * - It keeps SDL-specific types out of gameplay modules.
- * - It makes the main loop easy to reason about (poll → interpret → apply).
- * - The direction array supports multiple key presses in one frame, which plays nicely with the snake’s internal 2-turn buffer.
+ * SDL event polling and input mapping.
  */
 
-#include <stdbool.h>
-#include <SDL3/SDL.h>
-#include "snake.h"   // for Dir
-
 typedef struct EventsFrame {
-    bool quit;
-    bool toggle_grid;
-    bool toggle_interp;   // bound to P
-    bool continue_game;   // bound to L
-    bool next_track;     // NEW: Request to skip current track
+  bool quit;
+  bool toggle_grid;
+  bool toggle_interp;
+  bool continue_game;
+  bool next_track;
+  bool toggle_ui;
 
-    // One frame can produce multiple direction inputs.
-    // The snake module decides how many of these to accept.
-    int dir_count;
-    Dir dirs[8];
+  // Direction changes queued this frame.
+  Dir dirs[4];
+  int dir_count;
 } EventsFrame;
 
-// Polls SDL events and fills out an EventsFrame for the current frame.
-// The struct is “one-shot”: callers should reinitialize it every frame.
-void Events_Poll(EventsFrame* out);
+// Polls the input state for the current frame.
+void Events_Poll(EventsFrame *ev);
+
+// Process a single SDL event and update the frame struct.
+// Shared logic between Poll and unified event loops.
+void Events_ProcessEvent(EventsFrame *out, const SDL_Event *e);
+
+#ifdef __cplusplus
+}
+#endif
