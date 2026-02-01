@@ -167,8 +167,16 @@ $env:VCPKG_ROOT = (Get-Location)
 ```bash
 git clone https://github.com/ManifestJW/snake-sdl.git
 cd snake-sdl
-build-windows.bat release
+build-windows.bat [debug|release] [clean] [force]
+
+To just get a build done, use `build-windows.bat release`. By default, the script builds **debug** binaries if no preset is specified (i.e. if you run it directly).
 ```
+
+> [!TIP]
+> **Incremental Builds**: By default, `build-windows.bat` performs incremental builds and caches the launcher build.
+> - Use `clean` to delete the build directory and start fresh.
+> - Use `force` to force a rebuild of the Python launcher even if unchanged.
+> - Example: `.\build-windows.bat release clean force`
 
 > [!NOTE]
 > `build-windows.bat` will automatically attempt to locate and activate the Visual Studio Developer environment if it is not already active in your terminal.
