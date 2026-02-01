@@ -168,9 +168,8 @@ $env:VCPKG_ROOT = (Get-Location)
 git clone https://github.com/ManifestJW/snake-sdl.git
 cd snake-sdl
 build-windows.bat [debug|release] [clean] [force]
-
-To just get a build done, use `build-windows.bat release`. By default, the script builds **debug** binaries if no preset is specified (i.e. if you run it directly).
 ```
+To just get a build done, use `build-windows.bat release`. By default, the script builds **debug** binaries if no preset is specified (i.e. if you run it directly).
 
 > [!TIP]
 > **Incremental Builds**: By default, `build-windows.bat` performs incremental builds and caches the launcher build.
