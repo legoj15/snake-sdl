@@ -3,6 +3,8 @@ project(snake LANGUAGES C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(ROOT "${CMAKE_CURRENT_LIST_DIR}")
@@ -12,6 +14,7 @@ set(ROOT "${CMAKE_CURRENT_LIST_DIR}")
 # ------------------------------------------------------------
 find_package(SDL3 CONFIG REQUIRED)
 find_package(CURL CONFIG REQUIRED)
+find_package(imgui CONFIG REQUIRED)
 include(FetchContent)
 
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libs for vendored deps" FORCE)
@@ -65,14 +68,15 @@ endif()
 # ------------------------------------------------------------
 add_executable(snake ${SNAKE_SOURCES})
 
+# ImGui backends are provided by vcpkg's imgui targets when features are enabled.
 target_include_directories(snake PRIVATE include)
 
 # Link against SDL3 (from vcpkg) and SDL3_mixer (from FetchContent)
 if (WIN32 AND TARGET SDL3::SDL3-static)
-  # Link SDL3-static, SDL3_mixer, and LibCurl
-  target_link_libraries(snake PRIVATE SDL3::SDL3-static SDL3_mixer::SDL3_mixer CURL::libcurl)
+  # Link SDL3-static, SDL3_mixer, LibCurl, and ImGui
+  target_link_libraries(snake PRIVATE SDL3::SDL3-static SDL3_mixer::SDL3_mixer CURL::libcurl imgui::imgui)
 else()
-  target_link_libraries(snake PRIVATE SDL3::SDL3 SDL3_mixer::SDL3_mixer CURL::libcurl)
+  target_link_libraries(snake PRIVATE SDL3::SDL3 SDL3_mixer::SDL3_mixer CURL::libcurl imgui::imgui)
 endif()
 
 if (NOT WIN32)

@@ -6,6 +6,13 @@
     "libogg",
     "libvorbis",
     "opusfile",
-    "curl"
+    "curl",
+    {
+      "name": "imgui",
+      "features": [
+        "sdl3-binding",
+        "sdl3-renderer-binding"
+      ]
+    }
   ]
 }

@@ -43,69 +43,73 @@ REM ============================
 if not defined BUILD_DIR set BUILD_DIR=build
 set "GAME_DIR=%BUILD_DIR%\game"
 
-if exist "%BUILD_DIR%" rmdir /s /q "%BUILD_DIR%"
+REM ============================
+REM Optional Clean Build
+REM ============================
+set "DO_CLEAN=0"
+if "%~1"=="clean" set "DO_CLEAN=1"
+if "!DO_CLEAN!"=="1" (
+    echo Cleaning build directory...
+    if exist "%BUILD_DIR%" rmdir /s /q "%BUILD_DIR%"
+    if exist "dist" rmdir /s /q "dist"
+)
 
 REM ============================
 REM Resolve vcpkg toolchain
 REM ============================
 if defined VCPKG_TOOLCHAIN_FILE (
     set "TOOLCHAIN=%VCPKG_TOOLCHAIN_FILE%"
-) else if defined VCPKG_ROOT (
+    goto :vcpkg_resolved
+)
+if defined VCPKG_ROOT (
     set "TOOLCHAIN=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake"
-) else (
-    REM Try to find vcpkg in PATH if not set explicitly
-    for /f "delims=" %%I in ('where vcpkg 2^>nul') do (
-        set "VCPKG_ROOT=%%~dpI"
-        set "TOOLCHAIN=%%~dpIscripts\buildsystems\vcpkg.cmake"
-        goto :vcpkg_found
-    )
+    goto :vcpkg_resolved
+)
 
-    echo ERROR: vcpkg not configured.
-    echo.
-    echo Set one of:
-    echo   VCPKG_ROOT=path\to\vcpkg
-    echo   VCPKG_TOOLCHAIN_FILE=path\to\vcpkg\scripts\buildsystems\vcpkg.cmake
-    echo.
-    echo Or ensure 'vcpkg' is in your system PATH.
-    echo.
-    echo Example:
-    echo   set VCPKG_ROOT=C:\vcpkg
+REM Try to find vcpkg in PATH if not set explicitly
+for /f "delims=" %%I in ('where vcpkg 2^>nul') do (
+    set "VCPKG_ROOT=%%~dpI"
+    set "TOOLCHAIN=%%~dpIscripts\buildsystems\vcpkg.cmake"
+    goto :vcpkg_resolved
+)
+
+echo ERROR: vcpkg not configured.
+echo Set VCPKG_ROOT or ensure 'vcpkg' is in your PATH.
+exit /b 1
+
+:vcpkg_resolved
+if not exist "%TOOLCHAIN%" (
+    echo ERROR: vcpkg toolchain file not found: %TOOLCHAIN%
     exit /b 1
 )
 
 :vcpkg_found
-if not exist "%TOOLCHAIN%" (
-    echo ERROR: vcpkg toolchain file not found:
-    echo   %TOOLCHAIN%
-    exit /b 1
-)
-
 REM ============================
 REM Install vcpkg dependencies
 REM ============================
-if defined VCPKG_ROOT (
-    if exist "%VCPKG_ROOT%\vcpkg.exe" (
-        echo Installing vcpkg dependencies...
-        if defined VCPKG_TARGET_TRIPLET (
-            "%VCPKG_ROOT%\vcpkg.exe" install --triplet "%VCPKG_TARGET_TRIPLET%" --x-install-root "%BUILD_DIR%\vcpkg_installed"
-        ) else (
-            "%VCPKG_ROOT%\vcpkg.exe" install --x-install-root "%BUILD_DIR%\vcpkg_installed"
-        )
-        if errorlevel 1 (
-            echo.
-            echo ERROR: vcpkg installation failed.
-            echo Press any key to continue anyway, or press Ctrl+C to abort...
-            pause
-        )
-    ) else (
-        echo WARN: vcpkg executable not found at %VCPKG_ROOT%\vcpkg.exe (skipping install)
-    )
+if not defined VCPKG_ROOT goto :skip_vcpkg_install
+if not exist "%VCPKG_ROOT%\vcpkg.exe" (
+    echo WARN: vcpkg executable not found, skipping install.
+    goto :skip_vcpkg_install
 )
 
+echo Installing vcpkg dependencies...
+if defined VCPKG_TARGET_TRIPLET (
+    "%VCPKG_ROOT%\vcpkg.exe" install --triplet "%VCPKG_TARGET_TRIPLET%" --x-install-root "%BUILD_DIR%\vcpkg_installed"
+) else (
+    "%VCPKG_ROOT%\vcpkg.exe" install --x-install-root "%BUILD_DIR%\vcpkg_installed"
+)
+if errorlevel 1 (
+    echo ERROR: vcpkg installation failed.
+    pause
+)
+
+:skip_vcpkg_install
 REM ============================
 REM Configure + Build using presets
 REM ============================
 set "PRESET=%~1"
+if "!DO_CLEAN!"=="1" set "PRESET=%~2"
 if "%PRESET%"=="" set "PRESET=debug"
 
 cmake --preset "%PRESET%"
@@ -115,7 +119,7 @@ cmake --build --preset "%PRESET%" --parallel
 if errorlevel 1 exit /b 1
 
 REM ============================
-REM Build GUI (Nuitka onefile)
+REM Build GUI (Nuitka standalone)
 REM ============================
 set "VENV_DIR=launcher\.venv-build"
 if not defined PYTHON_BIN set "PYTHON_BIN=py"
@@ -127,38 +131,66 @@ if "%PYTHON_BIN%"=="py" (
 )
 
 if "%PYTHON_BIN%"=="py" (
-    %PYTHON_BIN% -3 -m venv "%VENV_DIR%"
+    if not exist "%VENV_DIR%" %PYTHON_BIN% -3 -m venv "%VENV_DIR%"
 ) else (
-    %PYTHON_BIN% -m venv "%VENV_DIR%"
+    if not exist "%VENV_DIR%" %PYTHON_BIN% -m venv "%VENV_DIR%"
 )
 if errorlevel 1 (
     echo ERROR: Python 3 not found. Install Python and retry.
     exit /b 1
 )
 call "%VENV_DIR%\Scripts\activate.bat"
+
+REM Only install requirements if they changed or venv is new
+set "REQ_HASH=%VENV_DIR%\requirements.hash"
+if not exist "launcher\requirements.txt" goto :skip_requirements
+set "NEEDS_INSTALL=1"
+if exist "%REQ_HASH%" (
+    fc /b "launcher\requirements.txt" "%REQ_HASH%" >nul 2>&1
+    if not errorlevel 1 set "NEEDS_INSTALL=0"
+)
+
+if "!NEEDS_INSTALL!"=="0" goto :skip_requirements
+echo Updating launcher dependencies...
 python -m pip install --upgrade pip >nul
 python -m pip install -r launcher\requirements.txt >nul
+copy /Y "launcher\requirements.txt" "%REQ_HASH%" >nul
+
+:skip_requirements
+set "LAUNCHER_OUT_DIR=%BUILD_DIR%\launcher_build"
+set "LAUNCHER_BIN=%LAUNCHER_OUT_DIR%\main.dist\launcher.exe"
+
+set "REBUILD_LAUNCHER=0"
+if not exist "%LAUNCHER_BIN%" set "REBUILD_LAUNCHER=1"
+if "%~1"=="force" set "REBUILD_LAUNCHER=1"
+if "%~2"=="force" set "REBUILD_LAUNCHER=1"
+
+if "!REBUILD_LAUNCHER!"=="0" (
+    echo Launcher is up to date. (Use '.\build-windows.bat force' or '.\build-windows.bat clean force' to rebuild it)
+    goto :launcher_done
+)
 
 echo Building launcher (standalone)...
-REM NOTE: We use --standalone instead of --onefile because --onefile often triggers 
-REM false positives in Windows Defender and other AV software, which can prevent 
-REM the launcher from opening.
-set "LAUNCHER_OUT_DIR=%BUILD_DIR%\launcher_build"
 python -m nuitka --standalone --assume-yes-for-downloads --lto=no --windows-console-mode=disable --enable-plugin=tk-inter --include-package=customtkinter --output-dir="%LAUNCHER_OUT_DIR%" --output-filename=launcher launcher\main.py
 if errorlevel 1 exit /b 1
+
+:launcher_done
 
 REM ============================
 REM Prepare Clean Distribution
 REM ============================
 set "DIST_DIR=dist"
-if exist "%DIST_DIR%" rmdir /s /q "%DIST_DIR%"
-mkdir "%DIST_DIR%"
-mkdir "%DIST_DIR%\game"
+if not exist "%DIST_DIR%" (
+    mkdir "%DIST_DIR%"
+)
+if not exist "%DIST_DIR%\game" (
+    mkdir "%DIST_DIR%\game"
+)
 
 echo Polishing distribution folder...
 set "LAUNCHER_DIST=%LAUNCHER_OUT_DIR%\main.dist"
 if exist "%LAUNCHER_DIST%" (
-    xcopy /E /I /Y "%LAUNCHER_DIST%\*" "%DIST_DIR%\" >nul
+    robocopy "%LAUNCHER_DIST%" "%DIST_DIR%" /E /XO /NJH /NJS /NP >nul
 )
 
 set "SNAKE_PATH="
@@ -183,8 +215,8 @@ if defined SNAKE_PATH (
 
 echo Copying game assets and dependencies...
 if exist "assets" (
-    mkdir "%DIST_DIR%\game\assets"
-    xcopy /E /I /Y "assets\*" "%DIST_DIR%\game\assets\" >nul
+    if not exist "%DIST_DIR%\game\assets" mkdir "%DIST_DIR%\game\assets"
+    robocopy "assets" "%DIST_DIR%\game\assets" /E /XO /NJH /NJS /NP >nul
 )
 copy /Y "%BUILD_DIR%\*.dll" "%DIST_DIR%\game\" >nul 2>nul
 if exist "launcher\readme.txt" (
