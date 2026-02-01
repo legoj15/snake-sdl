@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import subprocess
 from pathlib import Path
 import random
@@ -535,8 +536,14 @@ class App(ctk.CTk):
             "Ready. Build snakebot shared library, place it next to this GUI, then click Generate/Launch."
         )
 
+    def _get_base_path(self) -> Path:
+        if getattr(sys, "frozen", False):
+            # Combined with --onefile, sys.executable is the path to the .exe
+            return Path(sys.executable).parent
+        return Path(__file__).resolve().parent
+
     def _default_out_path(self) -> Path:
-        here = Path(__file__).resolve().parent
+        here = self._get_base_path()
         return here / "generated" / "cycle.cycle"
 
     def _require_cycle_ext(self, p: Path) -> None:
@@ -715,7 +722,7 @@ class App(ctk.CTk):
             self.preset_var.set("Custom")
 
     def _find_game_executable(self) -> Path:
-        here = Path(__file__).resolve().parent
+        here = self._get_base_path()
         if os.name == "nt":
             cand = here / "game" / "snake.exe"
         else:

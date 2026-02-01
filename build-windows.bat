@@ -115,11 +115,8 @@ cmake --build --preset "%PRESET%" --parallel
 if errorlevel 1 exit /b 1
 
 REM ============================
-REM Build GUI (Nuitka standalone)
+REM Build GUI (Nuitka onefile)
 REM ============================
-if exist "%GAME_DIR%" rmdir /s /q "%GAME_DIR%"
-mkdir "%GAME_DIR%"
-
 set "VENV_DIR=launcher\.venv-build"
 if not defined PYTHON_BIN set "PYTHON_BIN=py"
 if "%PYTHON_BIN%"=="py" (
@@ -142,18 +139,26 @@ call "%VENV_DIR%\Scripts\activate.bat"
 python -m pip install --upgrade pip >nul
 python -m pip install -r launcher\requirements.txt >nul
 
-echo Building launcher...
+echo Building launcher (standalone)...
+REM NOTE: We use --standalone instead of --onefile because --onefile often triggers 
+REM false positives in Windows Defender and other AV software, which can prevent 
+REM the launcher from opening.
 set "LAUNCHER_OUT_DIR=%BUILD_DIR%\launcher_build"
 python -m nuitka --standalone --assume-yes-for-downloads --lto=no --windows-console-mode=disable --enable-plugin=tk-inter --include-package=customtkinter --output-dir="%LAUNCHER_OUT_DIR%" --output-filename=launcher launcher\main.py
 if errorlevel 1 exit /b 1
 
-set "DIST_DIR=%LAUNCHER_OUT_DIR%\main.dist"
-if exist "%DIST_DIR%" (
-    xcopy /E /I /Y "%DIST_DIR%\*" "%BUILD_DIR%\" >nul
-    rmdir /s /q "%LAUNCHER_OUT_DIR%"
-)
-if exist "launcher\readme.txt" (
-    copy /Y "launcher\readme.txt" "%BUILD_DIR%\readme.txt" >nul
+REM ============================
+REM Prepare Clean Distribution
+REM ============================
+set "DIST_DIR=dist"
+if exist "%DIST_DIR%" rmdir /s /q "%DIST_DIR%"
+mkdir "%DIST_DIR%"
+mkdir "%DIST_DIR%\game"
+
+echo Polishing distribution folder...
+set "LAUNCHER_DIST=%LAUNCHER_OUT_DIR%\main.dist"
+if exist "%LAUNCHER_DIST%" (
+    xcopy /E /I /Y "%LAUNCHER_DIST%\*" "%DIST_DIR%\" >nul
 )
 
 set "SNAKE_PATH="
@@ -168,29 +173,27 @@ if not defined SNAKE_PATH (
         if not defined SNAKE_PATH set "SNAKE_PATH=%%F"
     )
 )
-if not defined SNAKE_PATH (
-    echo Snake binary missing; retrying explicit build target...
-    cmake --build --preset "%PRESET%" --parallel --target snake
-    if errorlevel 1 exit /b 1
-    if exist "%BUILD_DIR%\snake.exe" set "SNAKE_PATH=%BUILD_DIR%\snake.exe"
-)
 
 if defined SNAKE_PATH (
-    move /Y "%SNAKE_PATH%" "%GAME_DIR%\snake.exe" >nul
+    copy /Y "%SNAKE_PATH%" "%DIST_DIR%\game\snake.exe" >nul
 ) else (
     echo ERROR: missing snake binary after build.
     exit /b 1
 )
 
-REM This is an absolute bodge and I don't like it.
-echo Copying game assets...
+echo Copying game assets and dependencies...
 if exist "assets" (
-    if not exist "%GAME_DIR%\assets" mkdir "%GAME_DIR%\assets"
-    xcopy /E /I /Y "assets\*" "%GAME_DIR%\assets\" >nul
-) else (
-    echo WARN: assets folder not found. Skipping asset copy.
+    mkdir "%DIST_DIR%\game\assets"
+    xcopy /E /I /Y "assets\*" "%DIST_DIR%\game\assets\" >nul
 )
-copy /Y "%BUILD_DIR%\*.dll" "%GAME_DIR%\" >nul
+copy /Y "%BUILD_DIR%\*.dll" "%DIST_DIR%\game\" >nul 2>nul
+if exist "launcher\readme.txt" (
+    copy /Y "launcher\readme.txt" "%DIST_DIR%\readme.txt" >nul
+)
 
-echo Built: .\%BUILD_DIR%\launcher.exe
-echo Built: .\%GAME_DIR%\snake.exe
+echo.
+echo ============================
+echo Build Complete: .\%DIST_DIR%
+echo ============================
+echo Launcher: .\%DIST_DIR%\launcher.exe
+echo Game:     .\%DIST_DIR%\game\snake.exe

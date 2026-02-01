@@ -52,45 +52,23 @@ jobs:
       - name: Verify layout
         shell: pwsh
         run: |
-          if (!(Test-Path "build\\launcher.exe")) { throw "Missing build\\launcher.exe" }
-          if (!(Test-Path "build\\snakebot.dll")) { throw "Missing build\\snakebot.dll" }
-          if (!(Test-Path "build\\game\\snake.exe")) { throw "Missing build\\game\\snake.exe" }
-          if (!(Test-Path "build\\game\\assets\\bgm.wav")) { throw "Missing build\\game\\assets\\bgm.wav" }
+          if (!(Test-Path "dist\launcher.exe")) { throw "Missing dist\launcher.exe" }
+          if (!(Test-Path "dist\game\snake.exe")) { throw "Missing dist\game\snake.exe" }
+          if (!(Test-Path "dist\game\assets\bgm.wav")) { throw "Missing dist\game\assets\bgm.wav" }
+          if (!(Test-Path "dist\game\snakebot.dll")) { throw "Missing dist\game\snakebot.dll" }
 
       - name: Stage package (Windows)
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path dist | Out-Null
-          $pkg = "dist\\package-windows"
-          if (Test-Path $pkg) { Remove-Item -Recurse -Force $pkg }
-          New-Item -ItemType Directory -Force -Path $pkg | Out-Null
-          $exclude = @(
-            "CMakeFiles",
-            "vcpkg_installed",
-            "build.ninja",
-            "CMakeCache.txt",
-            "cmake_install.cmake",
-            "compile_commands.json",
-            ".ninja_deps",
-            ".ninja_log",
-            "vcpkg-manifest-install.log",
-            "game",
-            "snakebot.dll",
-            "readme.txt"
-          )
-          Get-ChildItem "build" | Where-Object {
-            $exclude -notcontains $_.Name -and $_.Extension -notin @(".zip", ".lib", ".exp") -and $_.Name -notlike "*.build"
-          } |
-            ForEach-Object { Copy-Item $_.FullName $pkg -Recurse }
-          Copy-Item "build\\game" $pkg -Recurse
-          Copy-Item "build\\snakebot.dll" $pkg
-          if (Test-Path "build\\readme.txt") { Copy-Item "build\\readme.txt" $pkg }
+          # Re-root the dist folder to match the artifact expectations
+          New-Item -ItemType Directory -Force -Path staging | Out-Null
+          Move-Item -Path "dist" -Destination "staging\package-windows"
 
       - name: Upload artifact (Windows)
         uses: actions/upload-artifact@v4
         with:
           name: snake-windows
-          path: dist/package-windows
+          path: staging/package-windows
 
   build-linux:
     name: Linux (Release)
