@@ -2,6 +2,42 @@
 setlocal EnableExtensions EnableDelayedExpansion
 
 REM ============================
+REM Force MSVC environment
+REM ============================
+where cl.exe >nul 2>&1
+if errorlevel 1 (
+    echo cl.exe not found in PATH. Attempting to locate Visual Studio...
+    
+    set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+    if not exist "!VSWHERE!" (
+        set "VSWHERE=%ProgramFiles%\Microsoft Visual Studio\Installer\vswhere.exe"
+    )
+
+    if exist "!VSWHERE!" (
+        for /f "usebackq tokens=*" %%i in (`"!VSWHERE!" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do (
+            set "VS_PATH=%%i"
+        )
+        
+        if defined VS_PATH (
+            echo Found Visual Studio at: !VS_PATH!
+            if exist "!VS_PATH!\VC\Auxiliary\Build\vcvarsall.bat" (
+                echo Activating x64 Developer Command Prompt...
+                call "!VS_PATH!\VC\Auxiliary\Build\vcvarsall.bat" x64
+            ) else (
+                echo ERROR: vcvarsall.bat not found in !VS_PATH!\VC\Auxiliary\Build\
+                exit /b 1
+            )
+        ) else (
+            echo ERROR: Visual Studio C++ tools not found via vswhere.
+            exit /b 1
+        )
+    ) else (
+        echo ERROR: vswhere.exe not found. Please install Visual Studio or run from a Developer Command Prompt.
+        exit /b 1
+    )
+)
+
+REM ============================
 REM Defaults
 REM ============================
 if not defined BUILD_DIR set BUILD_DIR=build

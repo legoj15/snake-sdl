@@ -159,7 +159,7 @@ $env:VCPKG_ROOT = (Get-Location)
 #### Prerequisites
 
 - Windows 10 or 11
-- Visual Studio 2022 with "Desktop development with C++"
+- Visual Studio 2022 or later with "Desktop development with C++"
 - Git
 
 #### Build steps
@@ -169,6 +169,9 @@ git clone https://github.com/ManifestJW/snake-sdl.git
 cd snake-sdl
 build-windows.bat release
 ```
+
+> [!NOTE]
+> `build-windows.bat` will automatically attempt to locate and activate the Visual Studio Developer environment if it is not already active in your terminal.
 
 ---
 
